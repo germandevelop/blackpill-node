@@ -19,7 +19,7 @@ add_subdirectory(${google_tests_SOURCE_DIR} ${google_tests_BINARY_DIR})
 add_executable(tests "")
 target_sources(tests
     PRIVATE
-        src/device/mcp23017_expander.test.cpp
+        src/devices/mcp23017_expander.test.cpp
 )
 target_compile_features(tests
     PRIVATE

@@ -25,9 +25,9 @@
 
 #include "tcp_client.h"
 
-#include "device/mcp23017_expander.h"
-#include "device/w25q32bv_flash.h"
-#include "device/vs1838_control.h"
+#include "devices/mcp23017_expander.h"
+#include "devices/w25q32bv_flash.h"
+#include "devices/vs1838_control.h"
 
 #include "node.h"
 
@@ -494,6 +494,27 @@ void board_i2c_1_unlock ()
 
 void board_timer_2_ic_isr_callback (uint32_t captured_value)
 {
+    static const uint32_t button_table[UNKNOWN_BUTTON] = 
+    {
+        [ZERO_BUTTON]   = ZERO_BUTTON_CODE,
+        [ONE_BUTTON]    = ONE_BUTTON_CODE,
+        [TWO_BUTTON]    = TWO_BUTTON_CODE,
+        [THREE_BUTTON]  = THREE_BUTTON_CODE,
+        [FOUR_BUTTON]   = FOUR_BUTTON_CODE,
+        [FIVE_BUTTON]   = FIVE_BUTTON_CODE,
+        [SIX_BUTTON]    = SIX_BUTTON_CODE,
+        [SEVEN_BUTTON]  = SEVEN_BUTTON_CODE,
+        [EIGHT_BUTTON]  = EIGHT_BUTTON_CODE,
+        [NINE_BUTTON]   = NINE_BUTTON_CODE,
+        [STAR_BUTTON]   = STAR_BUTTON_CODE,
+        [GRID_BUTTON]   = GRID_BUTTON_CODE,
+        [UP_BUTTON]     = UP_BUTTON_CODE,
+        [LEFT_BUTTON]   = LEFT_BUTTON_CODE,
+        [OK_BUTTON]     = OK_BUTTON_CODE,
+        [RIGHT_BUTTON]  = RIGHT_BUTTON_CODE,
+        [DOWN_BUTTON]   = DOWN_BUTTON_CODE,
+    };
+
     vs1838_control_process_bit(&vs1838_control, captured_value);
 
     bool is_frame_ready;
@@ -507,73 +528,14 @@ void board_timer_2_ic_isr_callback (uint32_t captured_value)
 
         node_remote_button_t remote_button = UNKNOWN_BUTTON;
 
-        if (button_code == ONE_BUTTON_CODE)
+        for (size_t i = 0U; i < ARRAY_SIZE(button_table); ++i)
         {
-            remote_button = ONE_BUTTON;
-        }
-        else if (button_code == TWO_BUTTON_CODE)
-        {
-            remote_button = TWO_BUTTON;
-        }
-        else if (button_code == THREE_BUTTON_CODE)
-        {
-            remote_button = THREE_BUTTON;
-        }
-        else if (button_code == FOUR_BUTTON_CODE)
-        {
-            remote_button = FOUR_BUTTON;
-        }
-        else if (button_code == FIVE_BUTTON_CODE)
-        {
-            remote_button = FIVE_BUTTON;
-        }
-        else if (button_code == SIX_BUTTON_CODE)
-        {
-            remote_button = SIX_BUTTON;
-        }
-        else if (button_code == SEVEN_BUTTON_CODE)
-        {
-            remote_button = SEVEN_BUTTON;
-        }
-        else if (button_code == EIGHT_BUTTON_CODE)
-        {
-            remote_button = EIGHT_BUTTON;
-        }
-        else if (button_code == NINE_BUTTON_CODE)
-        {
-            remote_button = NINE_BUTTON;
-        }
-        else if (button_code == STAR_BUTTON_CODE)
-        {
-            remote_button = STAR_BUTTON;
-        }
-        else if (button_code == ZERO_BUTTON_CODE)
-        {
-            remote_button = ZERO_BUTTON;
-        }
-        else if (button_code == GRID_BUTTON_CODE)
-        {
-            remote_button = GRID_BUTTON;
-        }
-        else if (button_code == UP_BUTTON_CODE)
-        {
-            remote_button = UP_BUTTON;
-        }
-        else if (button_code == LEFT_BUTTON_CODE)
-        {
-            remote_button = LEFT_BUTTON;
-        }
-        else if (button_code == OK_BUTTON_CODE)
-        {
-            remote_button = OK_BUTTON;
-        }
-        else if (button_code == RIGHT_BUTTON_CODE)
-        {
-            remote_button = RIGHT_BUTTON;
-        }
-        else if (button_code == DOWN_BUTTON_CODE)
-        {
-            remote_button = DOWN_BUTTON;
+            if (button_table[i] == button_code)
+            {
+                remote_button = (node_remote_button_t)(i);
+
+                break;
+            }
         }
 
         node_remote_control_ISR(remote_button);
@@ -845,7 +807,7 @@ void board_lfs_init_config (struct lfs_config *lfs_config)
 
 /* NOTE: display initialization
 
-#include "device/ssd1306_display.h"
+#include "devices/ssd1306_display.h"
 
 static ssd1306_display_t ssd1306_display;
 static uint8_t ssd1306_pixel_buffer[SSD1306_PIXEL_BUFFER_SIZE];

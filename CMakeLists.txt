@@ -141,8 +141,8 @@ target_include_directories(blackpill_general
 )
 target_sources(blackpill_general
     INTERFACE
-        src/device/mcp23017_expander.h
-        src/device/mcp23017_expander.c
+        src/devices/mcp23017_expander.h
+        src/devices/mcp23017_expander.c
 )
 target_compile_features(blackpill_general
     INTERFACE
@@ -212,12 +212,12 @@ target_sources(blackpill_board
         src/embedded_logger.h
         src/embedded_logger.c
 
-        src/device/w25q32bv_flash.h
-        src/device/w25q32bv_flash.c
-        src/device/ssd1306_display.h
-        src/device/ssd1306_display.c
-        src/device/bme280_sensor.h
-        src/device/bme280_sensor.c
+        src/devices/w25q32bv_flash.h
+        src/devices/w25q32bv_flash.c
+        src/devices/ssd1306_display.h
+        src/devices/ssd1306_display.c
+        src/devices/bme280_sensor.h
+        src/devices/bme280_sensor.c
 
         src/stm32f4xx_hal_conf.h
         src/stm32f4xx_it.h

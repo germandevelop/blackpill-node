@@ -5,7 +5,7 @@
 
 #include <gmock/gmock.h>
 
-#include "device/mcp23017_expander.h"
+#include "devices/mcp23017_expander.h"
 #include "std_error/std_error.h"
 
 
@@ -85,7 +85,10 @@ TEST_F(Mcp23017ExpanderTestFixture, Init)
     expected_port_int_pullup[PORT_A]    = 0x00;
     expected_port_int_pullup[PORT_B]    = 0x00;
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_CONFIGURATION_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t conf_addr      = 0x0A;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, conf_addr,
                 testing::_, testing::Pointee(expected_config_val), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -139,7 +142,10 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_2)
     uint8_t expected_port_direction[2];
     expected_port_direction[PORT_A] = 0x00;
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_A_DIRECTION_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t dir_a_addr     = 0x00;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, dir_a_addr,
                 testing::_, testing::Pointee(0x00), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -156,7 +162,10 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_3)
     // Arrange: create and set up a system under test
     int expected_ret_val = STD_FAILURE;
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_A_DIRECTION_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t dir_a_addr     = 0x00;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, dir_a_addr,
                 testing::_, testing::_, testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_FAILURE));
@@ -199,7 +208,10 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinDirection_2)
     expected_port_direction[PORT_B] = 0xFF;
     expected_port_direction[PORT_B] &= ~(1 << PIN_5);
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_DIRECTION_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t dir_b_addr     = 0x01;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, dir_b_addr,
                 testing::_, testing::Pointee(expected_port_direction[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -237,7 +249,10 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortOut_2)
     uint8_t expected_port_out[2];
     expected_port_out[PORT_B] = 0xFF;
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_OUTPUT_LATCH_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t latch_b_addr   = 0x15;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, latch_b_addr,
                 testing::_, testing::Pointee(expected_port_out[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -281,7 +296,10 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinOut_2)
     expected_port_out[PORT_B] = 0x00;
     expected_port_out[PORT_B] |= (1 << PIN_7);
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_OUTPUT_LATCH_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t latch_b_addr   = 0x15;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, latch_b_addr,
                 testing::_, testing::Pointee(expected_port_out[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -372,27 +390,34 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_2)
     expected_port_int_pullup[PORT_B]    = 0x00;
     expected_port_int_pullup[PORT_B]    |= (1 << PIN_3);
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_PULLUP_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t pullup_b_addr  = 0x0D;
+    uint16_t ctrl_b_addr    = 0x09;
+    uint16_t def_b_addr     = 0x07;
+    uint16_t enable_b_addr  = 0x05;
+    uint16_t polar_b_addr   = 0x03;
+
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, pullup_b_addr,
                 testing::_, testing::Pointee(expected_port_int_pullup[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_INTERRUPT_CONTROL_REGISTER_ADDRESS,
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, ctrl_b_addr,
                 testing::_, testing::Pointee(expected_port_int_cmp_mode[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_DEFAULT_VALUE_REGISTER_ADDRESS,
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, def_b_addr,
                 testing::_, testing::Pointee(expected_port_int_cmp_value[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_ENABLE_INTERRUPT_REGISTER_ADDRESS,
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, enable_b_addr,
                 testing::_, testing::Pointee(expected_port_int_control[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
-    EXPECT_CALL(*mockConfigI2C, writeI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_POLARITY_REGISTER_ADDRESS,
+    EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, polar_b_addr,
                 testing::_, testing::Pointee(expected_port_int_polarity[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -413,7 +438,10 @@ TEST_F(Mcp23017ExpanderTestFixture, GetPortIn)
     // Arrange: create and set up a system under test
     int expected_ret_val = STD_SUCCESS;
 
-    EXPECT_CALL(*mockConfigI2C, readI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_A_GPIO_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t gpio_a_addr    = 0x12;
+
+    EXPECT_CALL(*mockConfigI2C, readI2C(device_addr, gpio_a_addr,
                 testing::_, testing::_, testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -431,7 +459,10 @@ TEST_F(Mcp23017ExpanderTestFixture, GetPortIntFlag)
     // Arrange: create and set up a system under test
     int expected_ret_val = STD_SUCCESS;
 
-    EXPECT_CALL(*mockConfigI2C, readI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_B_INTERRUPT_FLAG_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t flag_b_addr    = 0x0F;
+
+    EXPECT_CALL(*mockConfigI2C, readI2C(device_addr, flag_b_addr,
                 testing::_, testing::_, testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
@@ -449,7 +480,10 @@ TEST_F(Mcp23017ExpanderTestFixture, GetPortIntCapture)
     // Arrange: create and set up a system under test
     int expected_ret_val = STD_SUCCESS;
 
-    EXPECT_CALL(*mockConfigI2C, readI2C(MCP23017_DEVICE_ADDRESS, MCP23017_PORT_A_INTERRUPT_CAPTURED_REGISTER_ADDRESS,
+    uint16_t device_addr    = 0x20;
+    uint16_t cap_a_addr     = 0x10;
+
+    EXPECT_CALL(*mockConfigI2C, readI2C(device_addr, cap_a_addr,
                 testing::_, testing::_, testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
