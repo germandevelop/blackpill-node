@@ -57,9 +57,9 @@ int board_uart_2_deinit (std_error_t * const error)
 }
 
 int board_uart_2_write (const uint8_t *data,
-                            uint16_t data_size,
-                            uint32_t timeout_ms,
-                            std_error_t * const error)
+                        uint16_t data_size,
+                        uint32_t timeout_ms,
+                        std_error_t * const error)
 {
     const HAL_StatusTypeDef status = HAL_UART_Transmit(&uart_2_handler, data, data_size, timeout_ms);
 
@@ -76,8 +76,9 @@ int board_uart_2_write (const uint8_t *data,
 void board_uart_2_msp_init (UART_HandleTypeDef *uart_handler)
 {
     UNUSED(uart_handler);
-//__HAL_RCC_USART2_CLK_SLEEP_ENABLE();
+    
     // Peripheral clock enable
+    //__HAL_RCC_USART2_CLK_SLEEP_ENABLE();
     __HAL_RCC_USART2_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 

@@ -34,7 +34,7 @@ target_link_libraries(tests
     PRIVATE
         GTest::gmock
         GTest::gmock_main
-        blackpill_general
+        blackpill_under_testing
 )
 
 # Setup tests scanning

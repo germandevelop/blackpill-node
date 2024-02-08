@@ -130,30 +130,21 @@ endif()
 
 
 
-add_subdirectory(external/common_code)
-
-# Create general blackpill target
-add_library(blackpill_general INTERFACE)
-target_link_libraries(blackpill_general INTERFACE std_error)
-target_include_directories(blackpill_general
+add_library(blackpill_config INTERFACE)
+target_include_directories(blackpill_config
     INTERFACE
         src
 )
-target_sources(blackpill_general
-    INTERFACE
-        src/devices/mcp23017_expander.h
-        src/devices/mcp23017_expander.c
-)
-target_compile_features(blackpill_general
+target_compile_features(blackpill_config
     INTERFACE
         c_std_17
 )
-set_target_properties(blackpill_general
-    PROPERTIES
-        C_STANDARD_REQUIRED ON
-        #C_EXTENSIONS OFF
+target_compile_definitions(blackpill_config
+    INTERFACE
+        $<$<CONFIG:Debug>:USE_FULL_ASSERT>
+        $<$<CONFIG:Release>:NDEBUG>
 )
-target_compile_options(blackpill_general
+target_compile_options(blackpill_config
     INTERFACE
         -Wall
         -Wextra
@@ -163,29 +154,104 @@ target_compile_options(blackpill_general
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Release>:-g0>
 )
-target_compile_definitions(blackpill_general
-    INTERFACE
-        $<$<CONFIG:Debug>:USE_FULL_ASSERT>
-        $<$<CONFIG:Release>:NDEBUG>
-)
 
-# Create blackpill board target
-add_library(blackpill_board INTERFACE)
-target_link_libraries(blackpill_board INTERFACE blackpill_general)
-target_link_libraries(blackpill_board INTERFACE vs1838_control)
-target_include_directories(blackpill_board
+
+add_subdirectory(external/common_code)
+
+# Create general blackpill bootloader target
+add_library(blackpill_bootloader INTERFACE)
+target_link_libraries(blackpill_bootloader INTERFACE blackpill_config)
+target_link_libraries(blackpill_bootloader INTERFACE std_error)
+target_include_directories(blackpill_bootloader
     INTERFACE
         external/arm_cmsis/CMSIS/Core/Include
         external/stm32_device/Include
         external/stm32_hal/Inc
+        external/little_fs
+)
+target_sources(blackpill_bootloader
+    INTERFACE
+        src/devices/w25q32bv_flash.h
+        src/devices/w25q32bv_flash.c
+        src/board.uart_2.h
+        src/board.uart_2.c
+        src/embedded_logger.h
+        src/embedded_logger.c
+
+        src/lfs_config.h
+        src/lfs_config.c
+        src/stm32f4xx_hal_conf.h
+        src/stm32f4xx_hal_debug.c
+
+        external/stm32_device/Source/Templates/system_stm32f4xx.c
+
+        external/stm32_hal/Src/stm32f4xx_hal.c
+        external/stm32_hal/Src/stm32f4xx_hal_cortex.c
+        external/stm32_hal/Src/stm32f4xx_hal_rcc.c
+        external/stm32_hal/Src/stm32f4xx_hal_rcc_ex.c
+        external/stm32_hal/Src/stm32f4xx_hal_gpio.c
+        external/stm32_hal/Src/stm32f4xx_hal_uart.c
+        external/stm32_hal/Src/stm32f4xx_hal_spi.c
+
+        external/little_fs/lfs_util.h
+        external/little_fs/lfs.h
+        external/little_fs/lfs.c
+)
+target_compile_definitions(blackpill_bootloader
+    INTERFACE
+        USE_HAL_DRIVER
+        LFS_CONFIG=lfs_config.h
+)
+target_compile_options(blackpill_bootloader
+    INTERFACE
+        -mcpu=cortex-m4
+        -mthumb
+        -mfpu=fpv4-sp-d16
+        -mfloat-abi=hard
+        -fdata-sections
+        -ffunction-sections
+)
+target_link_options(blackpill_bootloader
+    INTERFACE
+        -mcpu=cortex-m4
+        -mthumb
+        -mfpu=fpv4-sp-d16
+        -mfloat-abi=hard
+        -specs=nano.specs
+        -specs=nosys.specs
+        -u _printf_float
+        -lc
+        -lm
+        #-lnosys
+        -Wl,-Map=${PROJECT_NAME}.map,--cref
+        -Wl,--gc-sections
+        -Wl,--print-memory-usage
+)
+
+# Create blackpill under testing target
+add_library(blackpill_under_testing INTERFACE)
+target_link_libraries(blackpill_under_testing INTERFACE blackpill_config)
+target_link_libraries(blackpill_under_testing INTERFACE std_error)
+target_sources(blackpill_under_testing
+    INTERFACE
+        src/devices/mcp23017_expander.h
+        src/devices/mcp23017_expander.c
+)
+
+# Create blackpill firmware target
+add_library(blackpill_firmware INTERFACE)
+target_link_libraries(blackpill_firmware INTERFACE blackpill_bootloader)
+target_link_libraries(blackpill_firmware INTERFACE blackpill_under_testing)
+target_link_libraries(blackpill_firmware INTERFACE vs1838_control)
+target_include_directories(blackpill_firmware
+    INTERFACE
         external/free_rtos/include
         external/free_rtos/portable/GCC/ARM_CM4F
         external/w5500_driver/Ethernet
         external/lwjson_parser/lwjson/src/include
-        external/little_fs
         external/bme280_driver
 )
-target_sources(blackpill_board
+target_sources(blackpill_firmware
     INTERFACE
         src/board.h
         src/board.c
@@ -209,52 +275,35 @@ target_sources(blackpill_board
         src/node.c
         src/tcp_client.h
         src/tcp_client.c
-        src/embedded_logger.h
-        src/embedded_logger.c
 
-        src/devices/w25q32bv_flash.h
-        src/devices/w25q32bv_flash.c
         src/devices/ssd1306_display.h
         src/devices/ssd1306_display.c
         src/devices/bme280_sensor.h
         src/devices/bme280_sensor.c
 
-        src/stm32f4xx_hal_conf.h
+        src/FreeRTOSConfig.h
+        src/lwjson_opts.h
+
         src/stm32f4xx_it.h
         src/stm32f4xx_it.c
         src/stm32f4xx_hal_msp.c
         src/stm32f4xx_hal_timer_11.c
-        src/stm32f4xx_hal_debug.c
 
-        src/FreeRTOSConfig.h
-        src/lfs_config.h
-        src/lfs_config.c
-        src/lwjson_opts.h
-
-        external/stm32_device/Source/Templates/system_stm32f4xx.c
-
-        external/stm32_hal/Src/stm32f4xx_hal_adc.c
-        external/stm32_hal/Src/stm32f4xx_hal_adc_ex.c
         external/stm32_hal/Src/stm32f4xx_hal_tim.c
         external/stm32_hal/Src/stm32f4xx_hal_tim_ex.c
-        external/stm32_hal/Src/stm32f4xx_hal_rcc.c
-        external/stm32_hal/Src/stm32f4xx_hal_rcc_ex.c
-        external/stm32_hal/Src/stm32f4xx_hal_flash.c
-        external/stm32_hal/Src/stm32f4xx_hal_flash_ex.c
-        external/stm32_hal/Src/stm32f4xx_hal_flash_ramfunc.c
-        external/stm32_hal/Src/stm32f4xx_hal_gpio.c
+        external/stm32_hal/Src/stm32f4xx_hal_adc.c
+        external/stm32_hal/Src/stm32f4xx_hal_adc_ex.c
         external/stm32_hal/Src/stm32f4xx_hal_dma_ex.c
         external/stm32_hal/Src/stm32f4xx_hal_dma.c
         external/stm32_hal/Src/stm32f4xx_hal_pwr.c
         external/stm32_hal/Src/stm32f4xx_hal_pwr_ex.c
-        external/stm32_hal/Src/stm32f4xx_hal_cortex.c
-        external/stm32_hal/Src/stm32f4xx_hal.c
         external/stm32_hal/Src/stm32f4xx_hal_exti.c
-        external/stm32_hal/Src/stm32f4xx_hal_uart.c
-        external/stm32_hal/Src/stm32f4xx_hal_spi.c
         external/stm32_hal/Src/stm32f4xx_hal_i2c.c
         external/stm32_hal/Src/stm32f4xx_hal_i2c_ex.c
         external/stm32_hal/Src/stm32f4xx_hal_iwdg.c
+        external/stm32_hal/Src/stm32f4xx_hal_flash.c
+        external/stm32_hal/Src/stm32f4xx_hal_flash_ex.c
+        external/stm32_hal/Src/stm32f4xx_hal_flash_ramfunc.c
 
         external/free_rtos/tasks.c
         external/free_rtos/list.c
@@ -269,13 +318,14 @@ target_sources(blackpill_board
 
         external/lwjson_parser/lwjson/src/lwjson/lwjson.c
 
-        external/little_fs/lfs_util.h
-        external/little_fs/lfs.h
-        external/little_fs/lfs.c
-
         external/bme280_driver/bme280_defs.h
         external/bme280_driver/bme280.h
         external/bme280_driver/bme280.c
+)
+target_compile_definitions(blackpill_firmware
+    INTERFACE
+        _WIZCHIP_=5500
+        BME280_FLOAT_ENABLE
 )
 
 set_source_files_properties(external/w5500_driver/Ethernet/socket.c
@@ -290,79 +340,94 @@ set_source_files_properties(external/stm32_hal/Src/stm32f4xx_hal_flash_ex.c
     PROPERTIES COMPILE_OPTIONS "-Wno-unused-parameter")
 set_source_files_properties(external/stm32_hal/Src/stm32f4xx_hal_pwr.c
     PROPERTIES COMPILE_OPTIONS "-Wno-unused-parameter")
+set_source_files_properties(external/stm32_hal/Src/stm32f4xx_hal_adc_ex.c
+    PROPERTIES COMPILE_OPTIONS "-Wno-unused-parameter")
 
-target_compile_definitions(blackpill_board
+
+# Create SILVER blackpill target
+add_library(silver_config INTERFACE)
+target_include_directories(silver_config
     INTERFACE
-        USE_HAL_DRIVER
-        _WIZCHIP_=5500
-        LFS_CONFIG=lfs_config.h
-        BME280_FLOAT_ENABLE
-)
-
-target_compile_options(blackpill_board
-    INTERFACE
-        -mcpu=cortex-m4
-        -mthumb
-        -mfpu=fpv4-sp-d16
-        -mfloat-abi=hard
-        -fdata-sections
-        -ffunction-sections
-)
-
-target_link_options(blackpill_board
-    INTERFACE
-        -mcpu=cortex-m4
-        -mthumb
-        -mfpu=fpv4-sp-d16
-        -mfloat-abi=hard
-        -specs=nano.specs
-        -specs=nosys.specs
-        -u _printf_float
-        -lc
-        -lm
-        #-lnosys
-        -Wl,-Map=${PROJECT_NAME}.map,--cref
-        -Wl,--gc-sections
-        -Wl,--print-memory-usage
-)
-
-
-
-# Create SILVER blackpill target 
-add_executable(silver src/main.c)
-target_link_libraries(silver PRIVATE blackpill_board)
-target_include_directories(silver
-    PRIVATE
         src/silver
 )
-target_sources(silver
-    PRIVATE
+target_sources(silver_config
+    INTERFACE
         external/stm32_device/Source/Templates/gcc/startup_stm32f401xc.s
 )
-target_compile_definitions(silver
-    PRIVATE
+target_compile_definitions(silver_config
+    INTERFACE
         STM32F401xC
 )
-target_link_options(silver
+
+add_executable(silver_bootloader src/bootloader/main.c)
+target_link_libraries(silver_bootloader PRIVATE blackpill_bootloader)
+target_link_libraries(silver_bootloader PRIVATE silver_config)
+target_link_options(silver_bootloader
     PRIVATE
-        -T${CMAKE_SOURCE_DIR}/src/silver/STM32F401CCUx_FLASH.ld
+        -T${CMAKE_SOURCE_DIR}/src/silver/STM32F401CCUx_FLASH_BOOTLOADER.ld
+)
+add_custom_command(TARGET silver_bootloader
+    POST_BUILD
+        COMMAND arm-none-eabi-size silver_bootloader
+)
+add_custom_command(TARGET silver_bootloader
+    POST_BUILD
+        COMMAND arm-none-eabi-objcopy -O ihex silver_bootloader silver_bootloader.hex
+        COMMAND arm-none-eabi-objcopy -O binary silver_bootloader silver_bootloader.bin
 )
 
-add_custom_command(TARGET silver
+add_executable(silver_firmware src/main.c)
+target_link_libraries(silver_firmware PRIVATE blackpill_firmware)
+target_link_libraries(silver_firmware PRIVATE silver_config)
+target_link_options(silver_firmware
+    PRIVATE
+        -T${CMAKE_SOURCE_DIR}/src/silver/STM32F401CCUx_FLASH_APPLICATION.ld
+)
+add_custom_command(TARGET silver_firmware
         POST_BUILD
-        COMMAND arm-none-eabi-size silver
+        COMMAND arm-none-eabi-size silver_firmware
 )
-
-add_custom_command(TARGET silver
+add_custom_command(TARGET silver_firmware
         POST_BUILD
-        COMMAND arm-none-eabi-objcopy -O ihex silver blackpill_silver_firmware.hex
-        COMMAND arm-none-eabi-objcopy -O binary silver blackpill_silver_firmware.bin
+        COMMAND arm-none-eabi-objcopy -O ihex silver_firmware silver_firmware.hex
+        COMMAND arm-none-eabi-objcopy -O binary silver_firmware silver_firmware.bin
+)
+
+set_target_properties(silver_bootloader silver_firmware
+    PROPERTIES
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS OFF
+)
+
+add_custom_target(silver
+        dd if=${CMAKE_BINARY_DIR}/silver_bootloader.bin of=${CMAKE_BINARY_DIR}/silver.bin
+    COMMAND
+        dd if=${CMAKE_BINARY_DIR}/silver_firmware.bin of=${CMAKE_BINARY_DIR}/silver.bin bs=4K seek=8
+    DEPENDS
+        silver_bootloader silver_firmware
 )
 
 
+add_custom_target(flash
+    openocd
+        -f interface/stlink.cfg
+        -f target/stm32f4x.cfg
+        -c \"init\; reset halt\; stm32f4x unlock 0\"
+        -c \"flash write_image erase ${CMAKE_BINARY_DIR}/silver.bin 0x08000000\"
+        -c \"reset\; exit\"
+)
+
+add_custom_target(erase
+    openocd
+        -f interface/stlink.cfg
+        -f target/stm32f4x.cfg
+        -c \"init\; reset halt\; stm32f4x unlock 0\"
+        -c \"flash erase_sector 0 0 last\"
+        -c \"reset\; exit\"
+)
 
 # Create GOLD blackpill target 
-add_executable(gold src/main.c)
+#[[add_executable(gold src/main.c)
 target_link_libraries(gold PRIVATE blackpill_common)
 target_include_directories(gold
     PRIVATE
@@ -390,25 +455,4 @@ add_custom_command(TARGET gold
         POST_BUILD
         COMMAND arm-none-eabi-objcopy -O ihex gold blackpill_gold_firmware.hex
         COMMAND arm-none-eabi-objcopy -O binary gold blackpill_gold_firmware.bin
-)
-
-
-
-add_custom_target(flash
-    openocd
-        -f interface/stlink.cfg
-        -f target/stm32f4x.cfg
-        -c \"init\; reset halt\; stm32f4x unlock 0\"
-        -c "flash erase_sector 0 0 last"
-        -c \"flash write_bank 0 ${CMAKE_BINARY_DIR}/blackpill_silver_firmware.bin 0\"
-        -c \"reset\; exit\"
-)
-
-add_custom_target(erase
-    openocd
-        -f interface/stlink.cfg
-        -f target/stm32f4x.cfg
-        -c \"init\; reset halt\; stm32f4x unlock 0\"
-        -c \"flash erase_sector 0 0 last\"
-        -c \"reset\; exit\"
-)
+)]]
