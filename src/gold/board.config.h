@@ -8,6 +8,8 @@
 
 // BlackPill-Gold config
 
+#define SRAM_SIZE   (128 * 1024)    // 128 kB
+
 // SysClock
 #define CONFIG_CLOCK_REGULATOR_SCALE PWR_REGULATOR_VOLTAGE_SCALE1
 #define CONFIG_CLOCK_PLLM 25U

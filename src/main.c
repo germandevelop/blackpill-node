@@ -10,8 +10,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "board.h"
 #include "board.config.h"
+#include "board.h"
 
 
 static IWDG_HandleTypeDef iwdg_handler;

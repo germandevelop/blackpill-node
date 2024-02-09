@@ -8,14 +8,13 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal.h"
 
+#include "board.config.h"
 #include "board.uart_2.h"
 #include "embedded_logger.h"
 #include "std_error/std_error.h"
 
 
 #define APPLICATION_START_ADDRESS   0x08008000  // Sector 2
-
-#define SRAM_SIZE   (64 * 1024)             // 64 kB
 #define SRAM_END    (SRAM_BASE + SRAM_SIZE)
 
 
