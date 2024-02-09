@@ -53,14 +53,15 @@ void system_clock_init ()
     // Initializes the RCC Oscillators according to the specified parameters
     // in the RCC_OscInitTypeDef structure.
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLM = CONFIG_CLOCK_PLLM;
-    RCC_OscInitStruct.PLL.PLLN = CONFIG_CLOCK_PLLN;
-    RCC_OscInitStruct.PLL.PLLP = CONFIG_CLOCK_PLLP;
-    RCC_OscInitStruct.PLL.PLLQ = 4U;
+    RCC_OscInitStruct.OscillatorType    = RCC_OSCILLATORTYPE_LSI | RCC_OSCILLATORTYPE_HSE;
+    RCC_OscInitStruct.LSIState          = RCC_LSI_ON;
+    RCC_OscInitStruct.HSEState          = RCC_HSE_ON;
+    RCC_OscInitStruct.PLL.PLLState      = RCC_PLL_ON;
+    RCC_OscInitStruct.PLL.PLLSource     = RCC_PLLSOURCE_HSE;
+    RCC_OscInitStruct.PLL.PLLM          = CONFIG_CLOCK_PLLM;
+    RCC_OscInitStruct.PLL.PLLN          = CONFIG_CLOCK_PLLN;
+    RCC_OscInitStruct.PLL.PLLP          = CONFIG_CLOCK_PLLP;
+    RCC_OscInitStruct.PLL.PLLQ          = CONFIG_CLOCK_PLLQ;
 
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
     {
@@ -69,11 +70,11 @@ void system_clock_init ()
 
     // Initializes the CPU, AHB and APB buses clocks
     RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+    RCC_ClkInitStruct.ClockType         = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    RCC_ClkInitStruct.SYSCLKSource      = RCC_SYSCLKSOURCE_PLLCLK;
+    RCC_ClkInitStruct.AHBCLKDivider     = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider    = RCC_HCLK_DIV2;
+    RCC_ClkInitStruct.APB2CLKDivider    = RCC_HCLK_DIV1;
 
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, CONFIG_CLOCK_FLASH_LATENCY) != HAL_OK)
     {

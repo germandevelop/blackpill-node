@@ -23,8 +23,11 @@ static void board_print_uart_2 (const uint8_t *data, uint16_t data_size);
 static void freeze_loop ();
 
 int main ()
-{       
+{
     HAL_Init();
+
+    HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000U);
+    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
 
     int exit_code = board_uart_2_init(NULL);
 
@@ -60,7 +63,6 @@ int main ()
 
         SysTick->CTRL = 0x00;
 
-        //HAL_RCC_DeInit();
         HAL_DeInit();
 
         RCC->CIR = 0x00000000;
@@ -94,12 +96,5 @@ void freeze_loop ()
     while (true)
     {
     }
-    return;
-}
-
-void SysTick_Handler ()
-{
-    HAL_IncTick();
-
     return;
 }

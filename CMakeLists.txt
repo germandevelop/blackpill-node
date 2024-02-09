@@ -182,6 +182,9 @@ target_sources(blackpill_bootloader
         src/lfs_config.c
         src/stm32f4xx_hal_conf.h
         src/stm32f4xx_hal_debug.c
+        src/stm32f4xx_hal_msp.c
+        src/stm32f4xx_it.h
+        src/stm32f4xx_it.c
 
         external/stm32_device/Source/Templates/system_stm32f4xx.c
 
@@ -286,8 +289,7 @@ target_sources(blackpill_firmware
 
         src/stm32f4xx_it.h
         src/stm32f4xx_it.c
-        src/stm32f4xx_hal_msp.c
-        src/stm32f4xx_hal_timer_11.c
+        src/stm32f4xx_hal_it_timer11.c
 
         external/stm32_hal/Src/stm32f4xx_hal_tim.c
         external/stm32_hal/Src/stm32f4xx_hal_tim_ex.c
@@ -362,6 +364,10 @@ target_compile_definitions(silver_config
 add_executable(silver_bootloader src/bootloader/main.c)
 target_link_libraries(silver_bootloader PRIVATE blackpill_bootloader)
 target_link_libraries(silver_bootloader PRIVATE silver_config)
+target_sources(silver_bootloader
+    PRIVATE
+        src/bootloader/stm32f4xx_hal_systick.c
+)
 target_link_options(silver_bootloader
     PRIVATE
         -T${CMAKE_SOURCE_DIR}/src/silver/STM32F401CCUx_FLASH_BOOTLOADER.ld
@@ -384,11 +390,11 @@ target_link_options(silver_firmware
         -T${CMAKE_SOURCE_DIR}/src/silver/STM32F401CCUx_FLASH_APPLICATION.ld
 )
 add_custom_command(TARGET silver_firmware
-        POST_BUILD
+    POST_BUILD
         COMMAND arm-none-eabi-size silver_firmware
 )
 add_custom_command(TARGET silver_firmware
-        POST_BUILD
+    POST_BUILD
         COMMAND arm-none-eabi-objcopy -O ihex silver_firmware silver_firmware.hex
         COMMAND arm-none-eabi-objcopy -O binary silver_firmware silver_firmware.bin
 )
@@ -426,33 +432,72 @@ add_custom_target(erase
         -c \"reset\; exit\"
 )
 
-# Create GOLD blackpill target 
-#[[add_executable(gold src/main.c)
-target_link_libraries(gold PRIVATE blackpill_common)
-target_include_directories(gold
-    PRIVATE
+
+
+
+# Create GOLD blackpill target
+add_library(gold_config INTERFACE)
+target_include_directories(gold_config
+    INTERFACE
         src/gold
 )
-target_sources(gold
-    PRIVATE
+target_sources(gold_config
+    INTERFACE
         external/stm32_device/Source/Templates/gcc/startup_stm32f411xe.s
 )
-target_compile_definitions(gold
-    PRIVATE
+target_compile_definitions(gold_config
+    INTERFACE
         STM32F411xE
 )
-target_link_options(gold
+
+add_executable(gold_bootloader src/bootloader/main.c)
+target_link_libraries(gold_bootloader PRIVATE blackpill_bootloader)
+target_link_libraries(gold_bootloader PRIVATE gold_config)
+target_sources(gold_bootloader
     PRIVATE
-        -T${CMAKE_SOURCE_DIR}/src/gold/STM32F411CEUx_FLASH.ld
+        src/bootloader/stm32f4xx_hal_systick.c
+)
+target_link_options(gold_bootloader
+    PRIVATE
+        -T${CMAKE_SOURCE_DIR}/src/gold/STM32F411CEUx_FLASH_BOOTLOADER.ld
+)
+add_custom_command(TARGET gold_bootloader
+    POST_BUILD
+        COMMAND arm-none-eabi-size gold_bootloader
+)
+add_custom_command(TARGET gold_bootloader
+    POST_BUILD
+        COMMAND arm-none-eabi-objcopy -O ihex gold_bootloader gold_bootloader.hex
+        COMMAND arm-none-eabi-objcopy -O binary gold_bootloader gold_bootloader.bin
 )
 
-add_custom_command(TARGET gold
-        POST_BUILD
-        COMMAND arm-none-eabi-size gold
+add_executable(gold_firmware src/main.c)
+target_link_libraries(gold_firmware PRIVATE blackpill_firmware)
+target_link_libraries(gold_firmware PRIVATE gold_config)
+target_link_options(gold_firmware
+    PRIVATE
+        -T${CMAKE_SOURCE_DIR}/src/gold/STM32F411CEUx_FLASH_APPLICATION.ld
+)
+add_custom_command(TARGET gold_firmware
+    POST_BUILD
+        COMMAND arm-none-eabi-size gold_firmware
+)
+add_custom_command(TARGET gold_firmware
+    POST_BUILD
+        COMMAND arm-none-eabi-objcopy -O ihex gold_firmware gold_firmware.hex
+        COMMAND arm-none-eabi-objcopy -O binary gold_firmware gold_firmware.bin
 )
 
-add_custom_command(TARGET gold
-        POST_BUILD
-        COMMAND arm-none-eabi-objcopy -O ihex gold blackpill_gold_firmware.hex
-        COMMAND arm-none-eabi-objcopy -O binary gold blackpill_gold_firmware.bin
-)]]
+set_target_properties(gold_bootloader gold_firmware
+    PROPERTIES
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS OFF
+)
+
+add_custom_target(gold
+        dd if=${CMAKE_BINARY_DIR}/gold_bootloader.bin of=${CMAKE_BINARY_DIR}/gold.bin
+    COMMAND
+        dd if=${CMAKE_BINARY_DIR}/gold_firmware.bin of=${CMAKE_BINARY_DIR}/gold.bin bs=4K seek=8
+    DEPENDS
+        gold_bootloader gold_firmware
+)
