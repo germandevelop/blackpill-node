@@ -24,7 +24,7 @@
 #include <string.h>
 #include <inttypes.h>
 
-#include "embedded_logger.h"
+#include "logger.h"
 
 #ifndef LFS_NO_MALLOC
 #include <stdlib.h>

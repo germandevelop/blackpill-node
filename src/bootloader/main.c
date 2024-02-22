@@ -10,7 +10,7 @@
 
 #include "board.config.h"
 #include "board.uart_2.h"
-#include "embedded_logger.h"
+#include "logger.h"
 #include "std_error/std_error.h"
 
 
@@ -30,7 +30,7 @@ int main ()
 
     int exit_code = board_uart_2_init(NULL);
 
-    embedded_logger_config_t logger_config;
+    logger_config_t logger_config;
     logger_config.write_array_callback = board_print_uart_2;
 
     if (exit_code != STD_SUCCESS)
@@ -38,7 +38,7 @@ int main ()
         logger_config.write_array_callback = NULL;
     }
 
-    embedded_logger_init(&logger_config);
+    logger_init(&logger_config);
 
     if (*((uint32_t*) APPLICATION_START_ADDRESS) != SRAM_END)
     {

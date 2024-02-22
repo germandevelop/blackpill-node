@@ -20,6 +20,7 @@ add_executable(tests "")
 target_sources(tests
     PRIVATE
         src/devices/mcp23017_expander.test.cpp
+        src/node_T01.test.cpp
 )
 target_compile_features(tests
     PRIVATE

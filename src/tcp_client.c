@@ -4,6 +4,7 @@
  ************************************************************/
 
 #include "tcp_client.h"
+#include "tcp_client.types.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -16,18 +17,15 @@
 
 #include "socket.h"
 
-#include "embedded_logger.h"
+#include "logger.h"
 #include "std_error/std_error.h"
 
 
 #define RTOS_TASK_STACK_SIZE    512U            // 512*4=2048 bytes
-#define RTOS_TASK_PRIORITY      4U              // 0 - lowest, 4 - highest
+#define RTOS_TASK_PRIORITY      3U              // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "tcp_client"    // 16 - max length
 
 #define W5500_SOCKET_NUMBER 0U
-
-#define SEND_BUFFER_SIZE 256U
-#define RECV_BUFFER_SIZE 1024U
 
 #define DEFAULT_ERROR_TEXT  "TCP-Client error"
 #define MALLOC_ERROR_TEXT   "TCP-Client memory allocation error"
@@ -52,8 +50,8 @@ static TaskHandle_t task;
 static SemaphoreHandle_t send_mutex;
 
 static tcp_client_config_t config;
-static tcp_msg_t send_msg;
-static tcp_msg_t recv_msg;
+static tcp_msg_t send_msg_buffer;
+static tcp_msg_t recv_msg_buffer;
 
 
 static void tcp_client_spi_lock ();
@@ -74,6 +72,7 @@ static int tcp_client_connect (std_error_t * const error);
 int tcp_client_init (tcp_client_config_t const * const init_config, std_error_t * const error)
 {
     assert(init_config                          != NULL);
+    assert(init_config->process_msg_callback    != NULL);
     assert(init_config->spi_lock_callback       != NULL);
     assert(init_config->spi_unlock_callback     != NULL);
     assert(init_config->spi_select_callback     != NULL);
@@ -83,8 +82,8 @@ int tcp_client_init (tcp_client_config_t const * const init_config, std_error_t 
 
     memcpy((void*)(&config), (const void*)(init_config), sizeof(tcp_client_config_t));
 
-    send_msg.size = 0U;
-    recv_msg.size = 0U;
+    send_msg_buffer.size = 0U;
+    recv_msg_buffer.size = 0U;
 
     return tcp_client_malloc(error);
 }
@@ -100,14 +99,14 @@ void tcp_client_ISR ()
     return;
 }
 
-void tcp_client_send_message (tcp_client_serialize_msg_callback_t serialize_msg_callback, void *user_msg)
+void tcp_client_send_message (tcp_msg_t const * const send_msg)
 {
-    assert(serialize_msg_callback != NULL);
-    assert(user_msg != NULL);
+    assert(send_msg != NULL);
 
     xSemaphoreTake(send_mutex, portMAX_DELAY);
 
-    serialize_msg_callback(user_msg, &send_msg);
+    strncpy(send_msg_buffer.data, send_msg->data, send_msg->size);
+    send_msg_buffer.size = send_msg->size;
 
     xSemaphoreGive(send_mutex);
 
@@ -153,7 +152,8 @@ void tcp_client_task (void *parameters)
 
             xSemaphoreTake(send_mutex, portMAX_DELAY);
 
-            const int32_t exit_code = send(W5500_SOCKET_NUMBER, send_msg.buffer, send_msg.size);
+            const int32_t exit_code = send(W5500_SOCKET_NUMBER, (uint8_t*)send_msg_buffer.data, (uint16_t)send_msg_buffer.size);
+            send_msg_buffer.size = 0U;
 
             xSemaphoreGive(send_mutex);
 
@@ -177,16 +177,21 @@ void tcp_client_task (void *parameters)
             {
                 LOG("TCP-Client: ISR - SIK_RECEIVED\r\n");
 
-                uint8_t msg_buffer[256] = { 0 };
-                int32_t msg_size = recv(W5500_SOCKET_NUMBER, msg_buffer, 256);
+                tcp_msg_t recv_msg = { .data = { '\0' }, .size = 0U };
+
+                const int32_t msg_size = recv(W5500_SOCKET_NUMBER, (uint8_t*)recv_msg.data, ARRAY_SIZE(recv_msg.data));
 
                 if (msg_size > 0)
                 {
-                    LOG("TCP-Client: input message - \'%s\'\r\n", msg_buffer);
+                    LOG("TCP-Client: input message - \'%s\'\r\n", recv_msg.data);
+
+                    recv_msg.size = (size_t)msg_size;
+
+                    config.process_msg_callback(&recv_msg);
                 }
                 else
                 {
-                    LOG("TCP-Client: input message is empty\r\n");
+                    LOG("TCP-Client: input message error\r\n");
                 }
             }
 
@@ -347,20 +352,12 @@ int tcp_client_setup_w5500 (std_error_t * const error)
 
 int tcp_client_malloc (std_error_t * const error)
 {
-    send_msg.buffer = (uint8_t*)pvPortMalloc(SEND_BUFFER_SIZE * sizeof(uint8_t));
-    recv_msg.buffer = (uint8_t*)pvPortMalloc(RECV_BUFFER_SIZE * sizeof(uint8_t));
-
-    const bool are_buffers_allocated = (send_msg.buffer != NULL) && (recv_msg.buffer != NULL);
-
     send_mutex = xSemaphoreCreateMutex();
 
     const bool are_semaphores_allocated = (send_mutex != NULL);
 
-    if ((are_buffers_allocated != true) || (are_semaphores_allocated != true))
+    if (are_semaphores_allocated != true)
     {
-        vPortFree((void*)send_msg.buffer);
-        vPortFree((void*)recv_msg.buffer);
-
         vSemaphoreDelete(send_mutex);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);

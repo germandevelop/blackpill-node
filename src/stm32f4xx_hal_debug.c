@@ -5,7 +5,7 @@
 
 #ifdef USE_FULL_ASSERT
 
-#include "embedded_logger.h"
+#include "logger.h"
 
 void assert_failed (uint8_t *file, uint32_t line)
 {

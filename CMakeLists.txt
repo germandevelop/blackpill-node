@@ -175,8 +175,8 @@ target_sources(blackpill_bootloader
         src/devices/w25q32bv_flash.c
         src/board.uart_2.h
         src/board.uart_2.c
-        src/embedded_logger.h
-        src/embedded_logger.c
+        src/logger.h
+        src/logger.c
 
         src/lfs_config.h
         src/lfs_config.c
@@ -239,6 +239,8 @@ target_sources(blackpill_under_testing
     INTERFACE
         src/devices/mcp23017_expander.h
         src/devices/mcp23017_expander.c
+        src/node_T01.h
+        src/node_T01.c
 )
 
 # Create blackpill firmware target
@@ -258,6 +260,7 @@ target_sources(blackpill_firmware
     INTERFACE
         src/board.h
         src/board.c
+        src/board.types.h
         src/board.uart_2.h
         src/board.uart_2.c
         src/board.spi_1.h
@@ -276,8 +279,16 @@ target_sources(blackpill_firmware
         src/board.timer_3.c
         src/node.h
         src/node.c
+        src/node.mapper.h
+        src/node.mapper.c
         src/tcp_client.h
         src/tcp_client.c
+        src/tcp_client.types.h
+
+        src/board_T01.h
+        src/board_T01.c
+        src/node_T01.h
+        src/node_T01.c
 
         src/devices/ssd1306_display.h
         src/devices/ssd1306_display.c

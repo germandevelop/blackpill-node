@@ -12,8 +12,6 @@
 #include "std_error/std_error.h"
 
 
-#define DEVICE_ADDRESS 0x3C // 0x3D
-
 #define SET_DISPLAY_START_LINE_COMMAND 0x40
 
 
@@ -27,14 +25,17 @@ static void font16x26_draw_symbol (ssd1306_display_t * const self, uint8_t symbo
 static void font16x26_draw_pixel (ssd1306_display_t * const self, bool is_dark_pixel, uint16_t X, uint16_t Y);
 static void font16x26_get_table (uint16_t **table);
 
-int ssd1306_display_init (ssd1306_display_t * const self,
+int ssd1306_display_init (  ssd1306_display_t * const self,
                             ssd1306_display_config_t const * const init_config,
                             std_error_t * const error)
 {
-    assert(self != NULL);
-    assert(init_config != NULL);
-    assert(init_config->write_i2c_callback != NULL);
-    assert(init_config->pixel_buffer != NULL);
+    assert(self                             != NULL);
+    assert(init_config                      != NULL);
+    assert(init_config->write_i2c_callback  != NULL);
+    assert(init_config->pixel_buffer        != NULL);
+
+    bool is_address_valid = (init_config->device_address == SSD1306_DISPLAY_ADDRESS_1) || (init_config->device_address == SSD1306_DISPLAY_ADDRESS_2);
+    assert(is_address_valid == true);
 
     self->config = *init_config;
 
@@ -44,7 +45,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xAE;
 
-    int exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    int exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -55,7 +56,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x20;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -66,7 +67,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x10;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -77,7 +78,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xB0;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -88,7 +89,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xC8;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -99,7 +100,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x00;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -110,7 +111,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x10;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -121,7 +122,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x40;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -132,7 +133,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x81;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -143,7 +144,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xFF;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -154,7 +155,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xA1;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -165,7 +166,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xA6;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -176,7 +177,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xA8;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -186,7 +187,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x3F;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -197,7 +198,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xA4;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -208,7 +209,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xD3;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -219,7 +220,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x00;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -230,7 +231,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xD5;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -241,7 +242,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xF0;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -252,7 +253,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xD9;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -262,7 +263,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x22;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -273,7 +274,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xDA;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -283,7 +284,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x12;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -294,7 +295,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xDB;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -305,7 +306,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x20;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -316,7 +317,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x8D;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -326,7 +327,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0x14;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -337,7 +338,7 @@ int ssd1306_display_init (ssd1306_display_t * const self,
     data[0] = 0x00;
     data[1] = 0xAF;
 
-    exit_code = self->config.write_i2c_callback(DEVICE_ADDRESS, data, sizeof(data), 1U * 1000U, error);
+    exit_code = self->config.write_i2c_callback(self->config.device_address, data, sizeof(data), self->config.i2c_timeout_ms, error);
 
     if (exit_code != STD_SUCCESS)
     {
@@ -349,12 +350,12 @@ int ssd1306_display_init (ssd1306_display_t * const self,
 
 void ssd1306_display_reset_buffer (ssd1306_display_t * const self)
 {
-    memset(self->config.pixel_buffer, 0, SSD1306_PIXEL_BUFFER_SIZE);
+    memset(self->config.pixel_buffer, 0, SSD1306_DISPLAY_PIXEL_BUFFER_SIZE);
 
     return;
 }
 
-void ssd1306_display_draw_text_10x16 (ssd1306_display_t * const self,
+void ssd1306_display_draw_text_10x16 (  ssd1306_display_t * const self,
                                         char const * const text,
                                         size_t text_length,
                                         uint8_t X,
@@ -417,16 +418,16 @@ void font10x16_draw_symbol (ssd1306_display_t * const self, uint8_t symbol, uint
     return;
 }
 
-void font10x16_draw_pixel(ssd1306_display_t * const self, bool is_dark_pixel, uint8_t X, uint8_t Y)
+void font10x16_draw_pixel (ssd1306_display_t * const self, bool is_dark_pixel, uint8_t X, uint8_t Y)
 {
-    if ((X >= SSD1306_WIDTH_PX) || (Y >= SSD1306_HEIGHT_PX))
+    if ((X >= SSD1306_DISPLAY_WIDTH_PX) || (Y >= SSD1306_DISPLAY_HEIGHT_PX))
     {
         return;
     }
 
     uint16_t byteIdx = Y >> 3;
     uint8_t bitIdx = Y - (byteIdx << 3);
-    byteIdx *= SSD1306_WIDTH_PX;
+    byteIdx *= SSD1306_DISPLAY_WIDTH_PX;
     byteIdx += X;
 
     if (is_dark_pixel == true)
@@ -440,7 +441,7 @@ void font10x16_draw_pixel(ssd1306_display_t * const self, bool is_dark_pixel, ui
     return;
 }
 
-void ssd1306_display_draw_text_16x26 (ssd1306_display_t * const self,
+void ssd1306_display_draw_text_16x26 (  ssd1306_display_t * const self,
                                         char const * const text,
                                         size_t text_length,
                                         uint8_t X,
@@ -489,18 +490,18 @@ void font16x26_draw_symbol (ssd1306_display_t * const self, uint8_t symbol, uint
 
 void font16x26_draw_pixel (ssd1306_display_t * const self, bool is_dark_pixel, uint16_t X, uint16_t Y)
 {
-    if ((X >= SSD1306_WIDTH_PX) || (Y >= SSD1306_HEIGHT_PX))
+    if ((X >= SSD1306_DISPLAY_WIDTH_PX) || (Y >= SSD1306_DISPLAY_HEIGHT_PX))
     {
         return;
     }
 
     if (is_dark_pixel == true)
     {
-        self->config.pixel_buffer[X + (Y / 8U) * SSD1306_WIDTH_PX] &= ~(1 << (Y % 8U));
+        self->config.pixel_buffer[X + (Y / 8U) * SSD1306_DISPLAY_WIDTH_PX] &= ~(1 << (Y % 8U));
     }
     else
     {
-        self->config.pixel_buffer[X + (Y / 8U) * SSD1306_WIDTH_PX] |= 1 << (Y % 8U);
+        self->config.pixel_buffer[X + (Y / 8U) * SSD1306_DISPLAY_WIDTH_PX] |= 1 << (Y % 8U);
     }
     return;
 }
@@ -511,9 +512,9 @@ int ssd1306_display_update_full_screen (ssd1306_display_t * const self, std_erro
 
     if (self->config.write_i2c_dma_callback != NULL)
     {
-        return self->config.write_i2c_dma_callback(DEVICE_ADDRESS, self->config.pixel_buffer, SSD1306_PIXEL_BUFFER_SIZE, error);
+        return self->config.write_i2c_dma_callback(self->config.device_address, self->config.pixel_buffer, SSD1306_DISPLAY_PIXEL_BUFFER_SIZE, error);
     }
-    return self->config.write_i2c_callback(DEVICE_ADDRESS, self->config.pixel_buffer, SSD1306_PIXEL_BUFFER_SIZE, 10U * 1000U, error);
+    return self->config.write_i2c_callback(self->config.device_address, self->config.pixel_buffer, SSD1306_DISPLAY_PIXEL_BUFFER_SIZE, self->config.i2c_timeout_ms, error);
 }
 
 
@@ -6023,7 +6024,7 @@ void font10x16_get_symbol_height (uint8_t const * const symbol_table, uint8_t * 
     return;
 }
 
-void font16x26_get_table(uint16_t **table)
+void font16x26_get_table (uint16_t **table)
 {
     *table = (uint16_t*)font16x26_table;
 

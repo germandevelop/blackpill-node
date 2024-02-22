@@ -1,0 +1,123 @@
+/************************************************************
+ *   Author : German Mundinger
+ *   Date   : 2024
+ ************************************************************/
+
+#ifndef NODE_T01_H
+#define NODE_T01_H
+
+#define NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS  (30U * 1000U)       // 30 seconds
+#define NODE_T01_LUMINOSITY_PERIOD_MS           (2U * 60U * 1000U)  // 2 min
+#define NODE_T01_HUMIDITY_PERIOD_MS             (2U * 60U * 1000U)  // 2 min
+#define NODE_T01_DOOR_STATE_PERIOD_MS           (2U * 60U * 1000U)  // 2 min
+
+#define NODE_T01_DARKNESS_LEVEL_ADC 500U
+#define NODE_T01_HIGH_TEMPERATURE_C 25.0F
+#define NODE_T01_LOW_TEMPERATURE_C  15.0F
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "node/node.types.h"
+#include "node/node.command.h"
+#include "board.types.h"
+
+typedef struct node_T01 node_T01_t;
+typedef struct std_error std_error_t;
+
+typedef struct node_T01_state
+{
+    bool is_msg_to_send;
+
+    board_led_color_t status_led_color;
+    bool is_light_on;
+    bool is_display_on;
+    bool is_warning_led_on;
+
+} node_T01_state_t;
+
+typedef struct node_T01_luminosity
+{
+    uint32_t adc;
+    bool is_valid;
+
+} node_T01_luminosity_t;
+
+typedef struct node_T01_humidity
+{
+    float pressure_hPa;
+    float temperature_C;
+    float humidity_pct;
+    bool is_valid;
+
+} node_T01_humidity_t;
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void node_T01_init (node_T01_t * const self);
+
+void node_T01_get_state (node_T01_t * const self,
+                        node_T01_state_t * const state,
+                        uint32_t time_ms);
+
+void node_T01_process_luminosity (  node_T01_t * const self,
+                                    node_T01_luminosity_t const * const data,
+                                    uint32_t * const next_time_ms);
+
+void node_T01_process_humidity (node_T01_t * const self,
+                                node_T01_humidity_t const * const data,
+                                uint32_t * const next_time_ms);
+
+void node_T01_process_reed_switch ( node_T01_t * const self,
+                                    bool is_reed_switch_open,
+                                    uint32_t * const next_time_ms);
+
+void node_T01_process_remote_button (node_T01_t * const self,
+                                    board_remote_button_t remote_button);
+
+void node_T01_process_front_pir (node_T01_t * const self,
+                                uint32_t time_ms);
+
+void node_T01_get_light_data (  node_T01_t const * const self,
+                                uint32_t * const disable_time_ms);
+
+void node_T01_get_display_data (node_T01_t const * const self,
+                                node_T01_humidity_t * const data,
+                                uint32_t * const disable_time_ms);
+
+void node_T01_process_rcv_msg ( node_T01_t * const self,
+                                node_msg_t const * const rcv_msg,
+                                uint32_t time_ms);
+
+int node_T01_get_msg (  node_T01_t * const self,
+                        node_msg_t *msg,
+                        std_error_t * const error);
+
+#ifdef __cplusplus
+}
+#endif
+
+
+
+// Private
+typedef struct node_T01
+{
+    node_T01_state_t state;
+
+    node_mode_id_t mode;
+    bool is_dark;
+    bool is_door_open;
+
+    uint32_t light_and_display_start_time_ms;
+
+    node_T01_humidity_t humidity;
+
+    node_msg_t send_msg_buffer[8];
+    size_t send_msg_buffer_size;
+
+} node_T01_t;
+
+#endif // NODE_T01_H

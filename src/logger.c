@@ -3,16 +3,16 @@
  *   Date   : 2023
  ************************************************************/
 
-#include "embedded_logger.h"
+#include "logger.h"
 
 
 #define UNUSED(x) (void)(x)
 
 
-static embedded_logger_config_t config;
+static logger_config_t config;
 
 
-void embedded_logger_init (embedded_logger_config_t const * const init_config)
+void logger_init (logger_config_t const * const init_config)
 {
     config = *init_config;
 

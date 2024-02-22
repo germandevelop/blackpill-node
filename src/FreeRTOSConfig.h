@@ -100,7 +100,7 @@ extern uint32_t SystemCoreClock;
 #define INCLUDE_xQueueGetMutexHolder 0
 #define INCLUDE_xTaskGetCurrentTaskHandle 0
 #define INCLUDE_eTaskGetState 0
-#define INCLUDE_vTaskSuspend 0
+#define INCLUDE_vTaskSuspend 1
 #define INCLUDE_uxTaskGetStackHighWaterMark 0
 
 #endif // FREERTOS_CONFIG_H

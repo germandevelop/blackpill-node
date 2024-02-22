@@ -4,74 +4,124 @@
  ************************************************************/
 
 #include "node.h"
+#include "node/node.types.h"
+#include "node.mapper.h"
 
 #include <stdbool.h>
-#include <limits.h>
+#include <string.h>
 #include <assert.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "semphr.h"
 #include "queue.h"
-#include "timers.h"
 
-#include "lwjson/lwjson.h"
+#include "tcp_client.types.h"
 
-#include "embedded_logger.h"
 #include "std_error/std_error.h"
 
 
 #define RTOS_TASK_STACK_SIZE    512U    // 512*4=2048 bytes
-#define RTOS_TASK_PRIORITY      3U      // 0 - lowest, 4 - highest
+#define RTOS_TASK_PRIORITY      2U      // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "node"  // 16 - max length
 
-//#define LIGHT_LEVEL_PERIOD_MIN      (5U * 60U * 1000U) // 5 min
-#define LIGHT_LEVEL_PERIOD_MIN      (30U * 1000U) // 5 min
-#define REMOTE_BUTTON_QUEUE_SIZE    4U
+#define RTOS_QUEUE_TICKS_TO_WAIT    (1U * 100U)
+
+#define MSG_BUFFER_SIZE 8U
 
 #define DEFAULT_ERROR_TEXT  "Node error"
+#define MAPPER_ERROR_TEXT   "Node mapper error"
+#define QUEUE_ERROR_TEXT    "Node queue error"
 #define MALLOC_ERROR_TEXT   "Node memory allocation error"
-
-#define REMOTE_BUTTON_NOTIFICATION   (1 << 0)
 
 #define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 
 static TaskHandle_t task;
-static QueueHandle_t remote_button_queue;
-static TimerHandle_t light_level_timer;
+static QueueHandle_t work_msg_queue;
+static QueueHandle_t free_msg_queue;
 
 static node_config_t config;
+
+static node_msg_t *msg_buffer;
 
 
 static int node_malloc (std_error_t * const error);
 static void node_task (void *parameters);
-static void node_light_level_timer (TimerHandle_t timer);
 
 int node_init (node_config_t const * const init_config, std_error_t * const error)
 {
-    assert(init_config != NULL);
-    assert(init_config->get_light_level_callback != NULL);
-    assert(init_config->set_led_color_callback != NULL);
+    assert(init_config                          != NULL);
+    assert(init_config->receive_msg_callback    != NULL);
+    assert(init_config->send_tcp_msg_callback   != NULL);
 
     config = *init_config;
 
     return node_malloc(error);
 }
 
-void node_remote_control_ISR (node_remote_button_t remote_button)
+int node_send_msg (node_msg_t const * const send_msg, std_error_t * const error)
 {
-    BaseType_t is_higher_priority_task_woken;
+    node_msg_t *free_msg;
 
-    xQueueSendFromISR(remote_button_queue, (const void*)&remote_button, &is_higher_priority_task_woken);
+    if (xQueueReceive(free_msg_queue, (void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT) != pdPASS)
+    {
+        std_error_catch_custom(error, STD_FAILURE, QUEUE_ERROR_TEXT, __FILE__, __LINE__);
 
-    xTaskNotifyFromISR(task, REMOTE_BUTTON_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
+        return STD_FAILURE;
+    }
 
-    portYIELD_FROM_ISR(is_higher_priority_task_woken);
+    memcpy((void*)(free_msg), (const void*)(send_msg), sizeof(node_msg_t));
 
-    return;
+    xQueueSend(work_msg_queue, (const void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT);
+
+    return STD_SUCCESS;
 }
+
+int node_receive_tcp_msg (tcp_msg_t const * const recv_msg, std_error_t * const error)
+{
+    node_msg_t node_msg;
+
+    if (node_mapper_deserialize_message(recv_msg->data, &node_msg, error) != STD_SUCCESS)
+    {
+        std_error_catch_custom(error, STD_FAILURE, MAPPER_ERROR_TEXT, __FILE__, __LINE__);
+
+        return STD_FAILURE;
+    }
+
+    bool is_dest_node = false;
+
+    for (size_t i = 0U;i < node_msg.header.dest_array_size; ++i)
+    {
+        if (node_msg.header.dest_array[i] == config.id)
+        {
+            is_dest_node = true;
+
+            break;
+        }
+    }
+
+    if (is_dest_node != true)
+    {
+        return STD_SUCCESS;
+    }
+
+    node_msg_t *free_msg;
+
+    if (xQueueReceive(free_msg_queue, (void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT) != pdPASS)
+    {
+        std_error_catch_custom(error, STD_FAILURE, QUEUE_ERROR_TEXT, __FILE__, __LINE__);
+
+        return STD_FAILURE;
+    }
+
+    memcpy((void*)(free_msg), (const void*)(&node_msg), sizeof(node_msg_t));
+
+    xQueueSend(work_msg_queue, (const void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT);
+
+    return STD_SUCCESS;
+}
+
 
 void node_task (void *parameters)
 {
@@ -80,66 +130,56 @@ void node_task (void *parameters)
     std_error_t error;
     std_error_init(&error);
 
-    BaseType_t exit_code = xTimerStart(light_level_timer, 5U * 1000U);
-
-    if (exit_code != pdPASS)
+    for (size_t i = 0U; i < MSG_BUFFER_SIZE; ++i)
     {
-        std_error_catch_custom(&error, (int)exit_code, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
+        node_msg_t *free_msg = &msg_buffer[i];
 
-        LOG("%s\r\n", error.text);
+        xQueueSend(free_msg_queue, (const void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT);
     }
 
     while (true)
     {
-        uint32_t notification;
-        xTaskNotifyWait(0U, ULONG_MAX, &notification, 30U * 1000U);
+        node_msg_t *work_msg;
 
-        if ((notification & REMOTE_BUTTON_NOTIFICATION) != 0U)
+        if(xQueueReceive(work_msg_queue, (void*)&work_msg, portMAX_DELAY) == pdPASS)
         {
-            node_remote_button_t remote_button;
-
-            while (xQueueReceive(remote_button_queue, (void*)&remote_button, (TickType_t)0U) == pdPASS)
+            if (work_msg->header.source != config.id)
             {
-                LOG("Node: remote button - %i\r\n", remote_button);
+                tcp_msg_t send_msg;
+
+                node_mapper_serialize_message(work_msg, send_msg.data, &send_msg.size);
+
+                config.send_tcp_msg_callback(&send_msg);
             }
+            else
+            {
+                config.receive_msg_callback(work_msg);
+            }
+
+            xQueueSend(free_msg_queue, (const void*)&work_msg, RTOS_QUEUE_TICKS_TO_WAIT);
         }
     }
 
     return;
 }
 
-void node_light_level_timer (TimerHandle_t timer)
-{
-    UNUSED(timer);
-
-    //config.set_led_color_callback(NO_COLOR, NULL);
-
-    //vTaskDelay(1U * 1000U);
-
-    uint32_t light_level = 0U;
-    config.get_light_level_callback(&light_level, NULL);
-
-    //config.set_led_color_callback(GREEN_COLOR, NULL);
-
-    LOG("Node: light level - %lu\r\n", light_level);
-
-    return;
-}
 
 int node_malloc (std_error_t * const error)
 {
-    remote_button_queue = xQueueCreate(REMOTE_BUTTON_QUEUE_SIZE, sizeof(node_remote_button_t));
+    msg_buffer = (node_msg_t*)pvPortMalloc(MSG_BUFFER_SIZE * sizeof(node_msg_t));
 
-    const bool are_queues_allocated = (remote_button_queue != NULL);
+    const bool are_buffers_allocated = (msg_buffer != NULL);
 
-    light_level_timer = xTimerCreate("light_level", LIGHT_LEVEL_PERIOD_MIN, pdTRUE, NULL, node_light_level_timer);
+    work_msg_queue = xQueueCreate(MSG_BUFFER_SIZE, sizeof(node_msg_t*));
+    free_msg_queue = xQueueCreate(MSG_BUFFER_SIZE, sizeof(node_msg_t*));
 
-    const bool are_timers_allocated = (light_level_timer != NULL);
+    const bool are_queues_allocated = (work_msg_queue != NULL) && (free_msg_queue != NULL);
 
-    if ((are_queues_allocated != true) || (are_timers_allocated != true))
+    if ((are_buffers_allocated != true) || (are_queues_allocated != true))
     {
-        vQueueDelete(remote_button_queue);
-        xTimerDelete(light_level_timer, 0U);
+        vPortFree((void*)msg_buffer);
+        vQueueDelete(work_msg_queue);
+        vQueueDelete(free_msg_queue);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
 

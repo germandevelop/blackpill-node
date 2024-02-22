@@ -14,6 +14,7 @@
 
 #include "lfs.h"
 
+#include "board.types.h"
 #include "board.uart_2.h"
 #include "board.spi_1.h"
 #include "board.i2c_1.h"
@@ -23,24 +24,24 @@
 #include "board.timer_2.h"
 #include "board.timer_3.h"
 
-#include "tcp_client.h"
-
 #include "devices/mcp23017_expander.h"
 #include "devices/w25q32bv_flash.h"
 #include "devices/vs1838_control.h"
 
+#include "board_T01.h"
 #include "node.h"
+#include "tcp_client.h"
 
-#include "embedded_logger.h"
+#include "logger.h"
 #include "std_error/std_error.h"
 
 
 #define RTOS_TASK_STACK_SIZE    512U    // 512*4=2048 bytes
-#define RTOS_TASK_PRIORITY      1U      // 0 - lowest, 4 - highest
+#define RTOS_TASK_PRIORITY      4U      // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "board" // 16 - max length
 
-#define LIGHT_LEVEL_MEAUSEREMENT_COUNT 5U
-#define LIGHT_LEVEL_MEAUSEREMENT_TIMEOUT_MS (2U * 1000U)
+#define LUMINOSITY_MEAUSEREMENT_COUNT       5U
+#define LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS  (2U * 1000U)
 
 #define LFS_MIN_READ_BLOCK_SIZE 16U
 #define LFS_MIN_PROG_BLOCK_SIZE 16U
@@ -61,7 +62,6 @@ static board_config_t config;
 static mcp23017_expander_t mcp23017_expander;
 static w25q32bv_flash_t w25q32bv_flash;
 static vs1838_control_t vs1838_control;
-
 
 static uint8_t lfs_read_buffer[LFS_CACHE_SIZE];
 static uint8_t lfs_prog_buffer[LFS_CACHE_SIZE];
@@ -93,8 +93,8 @@ static void board_i2c_1_unlock ();
 
 static void board_timer_2_ic_isr_callback (uint32_t captured_value);
 
-static int board_set_led_color (node_led_color_t color, std_error_t * const error);
-static int board_get_light_level (uint32_t * const light_level, std_error_t * const error);
+static int board_set_led_color (board_led_color_t led_color, std_error_t * const error);
+static int board_get_luminosity (uint32_t * const luminosity_adc, std_error_t * const error);
 
 static int board_lfs_block_device_read (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, void *raw_data, lfs_size_t size);
 static int board_lfs_block_device_prog (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, const void *raw_data, lfs_size_t size);
@@ -123,22 +123,58 @@ void board_task (void *parameters)
 {
     UNUSED(parameters);
 
+    {
+        board_T01_config_t config;
+        config.mcp23017_expander = &mcp23017_expander;
+        config.w25q32bv_flash = &w25q32bv_flash;
+        config.set_led_color_callback = NULL;
+        config.get_luminosity_callback = NULL;
+
+        board_T01_init(&config, NULL);
+    }
+
     board_init_expander();
     board_init_filesystem();
     board_init_tcp_client();
     board_init_remote_control();
 
-    node_config_t node_config;
-    node_config.get_light_level_callback    = board_get_light_level;
-    node_config.set_led_color_callback      = board_set_led_color;
+    {
+        std_error_t error;
+        std_error_init(&error);
 
-    node_init(&node_config, NULL);
+        node_config_t config;
+        config.id                       = NODE_T01;
+        config.receive_msg_callback     = board_T01_receive_node_msg;
+        config.send_tcp_msg_callback    = tcp_client_send_message;
+
+        if (node_init(&config, &error) != STD_SUCCESS)
+        {
+            LOG("%s\r\n", error.text);
+        }
+    }
+
+    {
+        std_error_t error;
+        std_error_init(&error);
+
+        board_T01_config_t config;
+        config.mcp23017_expander        = &mcp23017_expander;
+        config.w25q32bv_flash           = &w25q32bv_flash;
+        config.set_led_color_callback   = board_set_led_color;
+        config.get_luminosity_callback  = board_get_luminosity;
+        config.send_node_msg_callback   = node_send_msg;
+
+        if (board_T01_init(&config, &error) != STD_SUCCESS)
+        {
+            LOG("%s\r\n", error.text);
+        }
+    }
 
     while (true)
     {
         vTaskDelay(config.watchdog_timeout_ms);
 
-        LOG("Feed watchdog\r\n");
+        LOG("Board : feed watchdog\r\n");
         config.refresh_watchdog_callback();
     }
     return;
@@ -162,7 +198,7 @@ void board_init_logger ()
 {
     int exit_code = board_uart_2_init(NULL);
 
-    embedded_logger_config_t logger_config;
+    logger_config_t logger_config;
     logger_config.write_array_callback = board_print_uart_2;
 
     if (exit_code != STD_SUCCESS)
@@ -170,7 +206,7 @@ void board_init_logger ()
         logger_config.write_array_callback = NULL;
     }
 
-    embedded_logger_init(&logger_config);
+    logger_init(&logger_config);
 
     return;
 }
@@ -335,7 +371,7 @@ void board_init_expander ()
     mcp23017_expander_config_t config;
     config.write_i2c_callback   = board_i2c_1_write_register;
     config.read_i2c_callback    = board_i2c_1_read_register;
-    config.i2c_timeout_ms       = 2U * 1000U;
+    config.i2c_timeout_ms       = 1U * 1000U;
 
     if (mcp23017_expander_init(&mcp23017_expander, &config, &error) != STD_SUCCESS)
     {
@@ -526,45 +562,45 @@ void board_timer_2_ic_isr_callback (uint32_t captured_value)
         vs1838_control_get_frame(&vs1838_control, &button_code);
         vs1838_control_reset_frame(&vs1838_control);
 
-        node_remote_button_t remote_button = UNKNOWN_BUTTON;
+        board_remote_button_t remote_button = UNKNOWN_BUTTON;
 
         for (size_t i = 0U; i < ARRAY_SIZE(button_table); ++i)
         {
             if (button_table[i] == button_code)
             {
-                remote_button = (node_remote_button_t)(i);
+                remote_button = (board_remote_button_t)(i);
 
                 break;
             }
         }
 
-        node_remote_control_ISR(remote_button);
+        board_T01_remote_control_ISR(remote_button);
     }
     return;
 }
 
-int board_set_led_color (node_led_color_t color, std_error_t * const error)
+int board_set_led_color (board_led_color_t led_color, std_error_t * const error)
 {
     board_timer_2_stop_channel_2(); // Green
     board_timer_3_deinit();         // Red + Blue
 
     int exit_code = STD_SUCCESS;
     
-    if (color == GREEN_COLOR)
+    if (led_color == GREEN_COLOR)
     {
         exit_code = board_timer_2_start_channel_2(error);
     }
-    else if ((color == BLUE_COLOR) || (color == RED_COLOR))
+    else if ((led_color == BLUE_COLOR) || (led_color == RED_COLOR))
     {
         exit_code = board_timer_3_init(error);
 
         if (exit_code == STD_SUCCESS)
         {
-            if (color == BLUE_COLOR)
+            if (led_color == BLUE_COLOR)
             {
                 exit_code = board_timer_3_start_channel_2(error);
             }
-            else if (color == RED_COLOR)
+            else if (led_color == RED_COLOR)
             {
                 exit_code = board_timer_3_start_channel_1(error);
             }
@@ -573,30 +609,30 @@ int board_set_led_color (node_led_color_t color, std_error_t * const error)
     return exit_code;
 }
 
-int board_get_light_level (uint32_t * const light_level, std_error_t * const error)
+int board_get_luminosity (uint32_t * const luminosity_adc, std_error_t * const error)
 {
     int exit_code = board_adc_1_init(error);
 
     if (exit_code == STD_SUCCESS)
     {
-        uint32_t light_buffer = 0U;
-        uint32_t light_buffer_size = 0U;
+        uint32_t luminosity_buffer = 0U;
+        uint32_t luminosity_buffer_size = 0U;
 
-        for (size_t i = 0U; i < LIGHT_LEVEL_MEAUSEREMENT_COUNT; ++i)
+        for (size_t i = 0U; i < LUMINOSITY_MEAUSEREMENT_COUNT; ++i)
         {
             uint32_t adc_value;
-            exit_code = board_adc_1_read_value(&adc_value, LIGHT_LEVEL_MEAUSEREMENT_TIMEOUT_MS, error);
+            exit_code = board_adc_1_read_value(&adc_value, LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS, error);
 
             if (exit_code == STD_SUCCESS)
             {
-                light_buffer += adc_value;
-                ++light_buffer_size;
+                luminosity_buffer += adc_value;
+                ++luminosity_buffer_size;
             }
         }
 
-        if (light_buffer_size != 0U)
+        if (luminosity_buffer_size != 0U)
         {
-            *light_level = light_buffer / light_buffer_size;
+            *luminosity_adc = luminosity_buffer / luminosity_buffer_size;
         }
         else
         {
@@ -758,89 +794,3 @@ void board_lfs_init_config (struct lfs_config *lfs_config)
 
     return;
 }
-
-
-
-
-
-/* NOTE: LFS using example
-
-    lfs_t lfs;
-    lfs_file_t file;
-    printf("Start\r\n");
-    int err = lfs_mount(&lfs, &cfg);
-    printf("Mount : %d\r\n", err);
-    
-    // reformat if we can't mount the filesystem
-    // this should only happen on the first boot
-    if (err)
-    {
-        printf("Format\r\n");
-        err = lfs_format(&lfs, &cfg);
-        printf("Mount: %d\r\n", err);
-        lfs_mount(&lfs, &cfg);
-    }
-
-    //lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
-    lfs_mkdir(&lfs, "config");
-    struct lfs_file_config config = { 0 };
-    config.buffer = (void*)lfs_file_buffer;
-    lfs_file_opencfg(&lfs, &file, "config/boot_count", LFS_O_RDWR | LFS_O_CREAT, &config);
-
-    uint32_t boot_count = 0;
-    lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-
-    // update boot count
-    boot_count += 1;
-    lfs_file_rewind(&lfs, &file);
-    lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
-
-    // remember the storage is not updated until the file is closed successfully
-    lfs_file_close(&lfs, &file);
-
-    // release any resources we were using
-    printf("Umount\r\n");
-    lfs_unmount(&lfs);
-
-    printf("boot_count: %d\r\n", boot_count);
-*/
-
-/* NOTE: display initialization
-
-#include "devices/ssd1306_display.h"
-
-static ssd1306_display_t ssd1306_display;
-static uint8_t ssd1306_pixel_buffer[SSD1306_PIXEL_BUFFER_SIZE];
-
-void board_init_display ()
-{
-    std_error_t error;
-    std_error_init(&error);
-
-    ssd1306_display_config_t config;
-    config.write_i2c_callback = board_i2c_1_write;
-    config.write_i2c_dma_callback = NULL;
-    config.pixel_buffer = ssd1306_pixel_buffer;
-
-    int exit_code = ssd1306_display_init(&ssd1306_display, &config, &error);
-
-    if (exit_code != STD_SUCCESS)
-    {
-        LOG("%s\r\n", error.text);
-
-        return;
-    }
-
-    ssd1306_display_reset_buffer(&ssd1306_display);
-    ssd1306_display_update_full_screen(&ssd1306_display, NULL);
-
-    uint8_t X_shift;
-    ssd1306_display_draw_text_10x16(&ssd1306_display, "hello", 5U, 2, 8, &X_shift);
-    ssd1306_display_draw_text_10x16(&ssd1306_display, " world", 6U, 2 + X_shift, 8, &X_shift);
-
-    ssd1306_display_draw_text_16x26(&ssd1306_display, "123456", 6U, 5, 40, &X_shift);
-    ssd1306_display_update_full_screen(&ssd1306_display, NULL);
-
-    return;
-}
-*/
