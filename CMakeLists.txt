@@ -424,9 +424,10 @@ add_custom_target(silver
         silver_bootloader silver_firmware
 )
 
+find_program(OPEN_OCD openocd REQUIRED)
 
 add_custom_target(flash
-    openocd
+    ${OPEN_OCD}
         -f interface/stlink.cfg
         -f target/stm32f4x.cfg
         -c \"init\; reset halt\; stm32f4x unlock 0\"
@@ -435,7 +436,7 @@ add_custom_target(flash
 )
 
 add_custom_target(erase
-    openocd
+    ${OPEN_OCD}
         -f interface/stlink.cfg
         -f target/stm32f4x.cfg
         -c \"init\; reset halt\; stm32f4x unlock 0\"
