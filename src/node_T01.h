@@ -27,12 +27,12 @@ typedef struct std_error std_error_t;
 
 typedef struct node_T01_state
 {
-    bool is_msg_to_send;
-
     board_led_color_t status_led_color;
     bool is_light_on;
     bool is_display_on;
     bool is_warning_led_on;
+
+    bool is_msg_to_send;
 
 } node_T01_state_t;
 

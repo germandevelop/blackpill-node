@@ -22,9 +22,13 @@ target_sources(tests
         src/devices/mcp23017_expander.test.cpp
         src/node_T01.test.cpp
 )
+target_compile_options(tests
+    PRIVATE
+        -Wno-missing-field-initializers
+)
 target_compile_features(tests
     PRIVATE
-        cxx_std_17
+        cxx_std_20
 )
 set_target_properties(tests
     PROPERTIES

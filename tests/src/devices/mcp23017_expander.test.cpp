@@ -66,30 +66,28 @@ TEST_F(Mcp23017ExpanderTestFixture, Init)
     init_config.i2c_timeout_ms     = 0U;
 
     int expected_ret_val = STD_SUCCESS;
-    uint8_t expected_config_val = (0 << 0) | (1 << 1) | (0 << 2) | (0 << 3) | (1 << 4) | (0 << 5) | (1 << 6) | (0 << 7);
-    uint8_t expected_port_direction[2], expected_port_out[2];
-    expected_port_direction[PORT_A] = 0xFF;
-    expected_port_direction[PORT_B] = 0xFF;
-    expected_port_out[PORT_A]       = 0x00;
-    expected_port_out[PORT_B]       = 0x00;
-    uint8_t expected_port_int_control[2], expected_port_int_cmp_mode[2], expected_port_int_cmp_value[2];
-    uint8_t expected_port_int_polarity[2], expected_port_int_pullup[2];
-    expected_port_int_control[PORT_A]   = 0x00;
-    expected_port_int_control[PORT_B]   = 0x00;
-    expected_port_int_cmp_mode[PORT_A]  = 0x00;
-    expected_port_int_cmp_mode[PORT_B]  = 0x00;
-    expected_port_int_cmp_value[PORT_A] = 0x00;
-    expected_port_int_cmp_value[PORT_B] = 0x00;
-    expected_port_int_polarity[PORT_A]  = 0x00;
-    expected_port_int_polarity[PORT_B]  = 0x00;
-    expected_port_int_pullup[PORT_A]    = 0x00;
-    expected_port_int_pullup[PORT_B]    = 0x00;
+    mcp23017_expander_image expected;
+    expected.config_reg = (0 << 0) | (1 << 1) | (0 << 2) | (0 << 3) | (1 << 4) | (0 << 5) | (1 << 6) | (0 << 7);
+    expected.port_direction_reg[PORT_A]     = 0xFF;
+    expected.port_direction_reg[PORT_B]     = 0xFF;
+    expected.port_out_reg[PORT_A]           = 0x00;
+    expected.port_out_reg[PORT_B]           = 0x00;
+    expected.port_int_control_reg[PORT_A]   = 0x00;
+    expected.port_int_control_reg[PORT_B]   = 0x00;
+    expected.port_int_cmp_mode_reg[PORT_A]  = 0x00;
+    expected.port_int_cmp_mode_reg[PORT_B]  = 0x00;
+    expected.port_int_cmp_value_reg[PORT_A] = 0x00;
+    expected.port_int_cmp_value_reg[PORT_B] = 0x00;
+    expected.port_int_polarity_reg[PORT_A]  = 0x00;
+    expected.port_int_polarity_reg[PORT_B]  = 0x00;
+    expected.port_int_pullup_reg[PORT_A]    = 0x00;
+    expected.port_int_pullup_reg[PORT_B]    = 0x00;
 
     uint16_t device_addr    = 0x20;
     uint16_t conf_addr      = 0x0A;
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, conf_addr,
-                testing::_, testing::Pointee(expected_config_val), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.config_reg), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
@@ -99,29 +97,29 @@ TEST_F(Mcp23017ExpanderTestFixture, Init)
 
     // Assert: make unit test pass or fail
     ASSERT_EQ(ret_val, expected_ret_val);
-    EXPECT_EQ(init_expander.config_reg_image, expected_config_val);
-    EXPECT_EQ(init_expander.port_direction_reg_image[PORT_A], expected_port_direction[PORT_A]);
-    EXPECT_EQ(init_expander.port_direction_reg_image[PORT_B], expected_port_direction[PORT_B]);
-    EXPECT_EQ(init_expander.port_out_reg_image[PORT_A], expected_port_out[PORT_A]);
-    EXPECT_EQ(init_expander.port_out_reg_image[PORT_B], expected_port_out[PORT_B]);
-    EXPECT_EQ(init_expander.port_int_control_reg_image[PORT_A], expected_port_int_control[PORT_A]);
-    EXPECT_EQ(init_expander.port_int_control_reg_image[PORT_B], expected_port_int_control[PORT_B]);
-    EXPECT_EQ(init_expander.port_int_cmp_mode_reg_image[PORT_A], expected_port_int_cmp_mode[PORT_A]);
-    EXPECT_EQ(init_expander.port_int_cmp_mode_reg_image[PORT_B], expected_port_int_cmp_mode[PORT_B]);
-    EXPECT_EQ(init_expander.port_int_cmp_value_reg_image[PORT_A], expected_port_int_cmp_value[PORT_A]);
-    EXPECT_EQ(init_expander.port_int_cmp_value_reg_image[PORT_B], expected_port_int_cmp_value[PORT_B]);
-    EXPECT_EQ(init_expander.port_int_polarity_reg_image[PORT_A], expected_port_int_polarity[PORT_A]);
-    EXPECT_EQ(init_expander.port_int_polarity_reg_image[PORT_B], expected_port_int_polarity[PORT_B]);
-    EXPECT_EQ(init_expander.port_int_pullup_reg_image[PORT_A], expected_port_int_pullup[PORT_A]);
-    EXPECT_EQ(init_expander.port_int_pullup_reg_image[PORT_B], expected_port_int_pullup[PORT_B]);
+    EXPECT_EQ(init_expander.image.config_reg,                       expected.config_reg);
+    EXPECT_EQ(init_expander.image.port_direction_reg[PORT_A],       expected.port_direction_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_direction_reg[PORT_B],       expected.port_direction_reg[PORT_B]);
+    EXPECT_EQ(init_expander.image.port_out_reg[PORT_A],             expected.port_out_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_out_reg[PORT_B],             expected.port_out_reg[PORT_B]);
+    EXPECT_EQ(init_expander.image.port_int_control_reg[PORT_A],     expected.port_int_control_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_int_control_reg[PORT_B],     expected.port_int_control_reg[PORT_B]);
+    EXPECT_EQ(init_expander.image.port_int_cmp_mode_reg[PORT_A],    expected.port_int_cmp_mode_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_int_cmp_mode_reg[PORT_B],    expected.port_int_cmp_mode_reg[PORT_B]);
+    EXPECT_EQ(init_expander.image.port_int_cmp_value_reg[PORT_A],   expected.port_int_cmp_value_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_int_cmp_value_reg[PORT_B],   expected.port_int_cmp_value_reg[PORT_B]);
+    EXPECT_EQ(init_expander.image.port_int_polarity_reg[PORT_A],    expected.port_int_polarity_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_int_polarity_reg[PORT_B],    expected.port_int_polarity_reg[PORT_B]);
+    EXPECT_EQ(init_expander.image.port_int_pullup_reg[PORT_A],      expected.port_int_pullup_reg[PORT_A]);
+    EXPECT_EQ(init_expander.image.port_int_pullup_reg[PORT_B],      expected.port_int_pullup_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_1)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_direction[2];
-    expected_port_direction[PORT_A] = 0x00;
-    expected_port_direction[PORT_B] = 0xFF;
+    mcp23017_expander_image expected;
+    expected.port_direction_reg[PORT_A] = 0x00;
+    expected.port_direction_reg[PORT_B] = 0xFF;
 
     ON_CALL(*mockConfigI2C, writeI2C)
             .WillByDefault(testing::Return(STD_SUCCESS));
@@ -132,15 +130,15 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_1)
     mcp23017_expander_set_port_direction(&expander, PORT_B, INPUT_DIRECTION, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_direction_reg_image[PORT_A], expected_port_direction[PORT_A]);
-    EXPECT_EQ(expander.port_direction_reg_image[PORT_B], expected_port_direction[PORT_B]);
+    EXPECT_EQ(expander.image.port_direction_reg[PORT_A], expected.port_direction_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_direction_reg[PORT_B], expected.port_direction_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_2)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_direction[2];
-    expected_port_direction[PORT_A] = 0x00;
+    mcp23017_expander_image expected;
+    expected.port_direction_reg[PORT_A] = 0x00;
 
     uint16_t device_addr    = 0x20;
     uint16_t dir_a_addr     = 0x00;
@@ -154,7 +152,7 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_2)
     mcp23017_expander_set_port_direction(&expander, PORT_A, OUTPUT_DIRECTION, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_direction_reg_image[PORT_A], expected_port_direction[PORT_A]);
+    EXPECT_EQ(expander.image.port_direction_reg[PORT_A], expected.port_direction_reg[PORT_A]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_3)
@@ -180,10 +178,10 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortDirection_3)
 TEST_F(Mcp23017ExpanderTestFixture, SetPinDirection_1)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_direction[2];
-    expected_port_direction[PORT_A] = 0xFF;
-    expected_port_direction[PORT_B] = 0xFF;
-    expected_port_direction[PORT_B] &= ~((1 << PIN_2) | (1 << PIN_5) | (1 << PIN_6));
+    mcp23017_expander_image expected;
+    expected.port_direction_reg[PORT_A] = 0xFF;
+    expected.port_direction_reg[PORT_B] = 0xFF;
+    expected.port_direction_reg[PORT_B] &= ~((1 << PIN_2) | (1 << PIN_5) | (1 << PIN_6));
 
     ON_CALL(*mockConfigI2C, writeI2C)
             .WillByDefault(testing::Return(STD_SUCCESS));
@@ -197,22 +195,22 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinDirection_1)
     mcp23017_expander_set_pin_direction(&expander, PORT_B, PIN_7, INPUT_DIRECTION, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_direction_reg_image[PORT_A], expected_port_direction[PORT_A]);
-    EXPECT_EQ(expander.port_direction_reg_image[PORT_B], expected_port_direction[PORT_B]);
+    EXPECT_EQ(expander.image.port_direction_reg[PORT_A], expected.port_direction_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_direction_reg[PORT_B], expected.port_direction_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPinDirection_2)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_direction[2];
-    expected_port_direction[PORT_B] = 0xFF;
-    expected_port_direction[PORT_B] &= ~(1 << PIN_5);
+    mcp23017_expander_image expected;
+    expected.port_direction_reg[PORT_B] = 0xFF;
+    expected.port_direction_reg[PORT_B] &= ~(1 << PIN_5);
 
     uint16_t device_addr    = 0x20;
     uint16_t dir_b_addr     = 0x01;
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, dir_b_addr,
-                testing::_, testing::Pointee(expected_port_direction[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_direction_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
@@ -220,15 +218,15 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinDirection_2)
     mcp23017_expander_set_pin_direction(&expander, PORT_B, PIN_5, OUTPUT_DIRECTION, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_direction_reg_image[PORT_B], expected_port_direction[PORT_B]);
+    EXPECT_EQ(expander.image.port_direction_reg[PORT_B], expected.port_direction_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPortOut_1)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_out[2];
-    expected_port_out[PORT_A] = 0x00;
-    expected_port_out[PORT_B] = 0xFF;
+    mcp23017_expander_image expected;
+    expected.port_out_reg[PORT_A] = 0x00;
+    expected.port_out_reg[PORT_B] = 0xFF;
 
     ON_CALL(*mockConfigI2C, writeI2C)
             .WillByDefault(testing::Return(STD_SUCCESS));
@@ -239,21 +237,21 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortOut_1)
     mcp23017_expander_set_port_out(&expander, PORT_B, HIGH_GPIO, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_out_reg_image[PORT_A], expected_port_out[PORT_A]);
-    EXPECT_EQ(expander.port_out_reg_image[PORT_B], expected_port_out[PORT_B]);
+    EXPECT_EQ(expander.image.port_out_reg[PORT_A], expected.port_out_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_out_reg[PORT_B], expected.port_out_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPortOut_2)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_out[2];
-    expected_port_out[PORT_B] = 0xFF;
+    mcp23017_expander_image expected;
+    expected.port_out_reg[PORT_B] = 0xFF;
 
     uint16_t device_addr    = 0x20;
     uint16_t latch_b_addr   = 0x15;
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, latch_b_addr,
-                testing::_, testing::Pointee(expected_port_out[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_out_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
@@ -261,16 +259,16 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPortOut_2)
     mcp23017_expander_set_port_out(&expander, PORT_B, HIGH_GPIO, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_out_reg_image[PORT_B], expected_port_out[PORT_B]);
+    EXPECT_EQ(expander.image.port_out_reg[PORT_B], expected.port_out_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPinOut_1)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_out[2];
-    expected_port_out[PORT_A] = 0x00;
-    expected_port_out[PORT_B] = 0x00;
-    expected_port_out[PORT_B] |= (1 << PIN_2) | (1 << PIN_3) | (1 << PIN_4) | (1 << PIN_7);
+    mcp23017_expander_image expected;
+    expected.port_out_reg[PORT_A] = 0x00;
+    expected.port_out_reg[PORT_B] = 0x00;
+    expected.port_out_reg[PORT_B] |= (1 << PIN_2) | (1 << PIN_3) | (1 << PIN_4) | (1 << PIN_7);
 
     ON_CALL(*mockConfigI2C, writeI2C)
             .WillByDefault(testing::Return(STD_SUCCESS));
@@ -285,22 +283,22 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinOut_1)
     mcp23017_expander_set_pin_out(&expander, PORT_B, PIN_5, LOW_GPIO, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_out_reg_image[PORT_A], expected_port_out[PORT_A]);
-    EXPECT_EQ(expander.port_out_reg_image[PORT_B], expected_port_out[PORT_B]);
+    EXPECT_EQ(expander.image.port_out_reg[PORT_A], expected.port_out_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_out_reg[PORT_B], expected.port_out_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPinOut_2)
 {
     // Arrange: create and set up a system under test
-    uint8_t expected_port_out[2];
-    expected_port_out[PORT_B] = 0x00;
-    expected_port_out[PORT_B] |= (1 << PIN_7);
+    mcp23017_expander_image expected;
+    expected.port_out_reg[PORT_B] = 0x00;
+    expected.port_out_reg[PORT_B] |= (1 << PIN_7);
 
     uint16_t device_addr    = 0x20;
     uint16_t latch_b_addr   = 0x15;
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, latch_b_addr,
-                testing::_, testing::Pointee(expected_port_out[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_out_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
@@ -308,7 +306,7 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinOut_2)
     mcp23017_expander_set_pin_out(&expander, PORT_B, PIN_7, HIGH_GPIO, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_out_reg_image[PORT_B], expected_port_out[PORT_B]);
+    EXPECT_EQ(expander.image.port_out_reg[PORT_B], expected.port_out_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_1)
@@ -328,23 +326,22 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_1)
     config_pin_7.polarity   = INVERTED_POLARITY;
     config_pin_7.pullup     = ENABLE_PULL_UP;
 
-    uint8_t expected_port_int_control[2], expected_port_int_cmp_mode[2], expected_port_int_cmp_value[2];
-    uint8_t expected_port_int_polarity[2], expected_port_int_pullup[2];
-    expected_port_int_control[PORT_A]   = 0x00;
-    expected_port_int_control[PORT_B]   = 0x00;
-    expected_port_int_control[PORT_B]   |= (1 << PIN_3) | (1 << PIN_7);
-    expected_port_int_cmp_mode[PORT_A]  = 0x00;
-    expected_port_int_cmp_mode[PORT_B]  = 0x00;
-    expected_port_int_cmp_mode[PORT_B]  |= (1 << PIN_3);
-    expected_port_int_cmp_value[PORT_A] = 0x00;
-    expected_port_int_cmp_value[PORT_B] = 0x00;
-    expected_port_int_cmp_value[PORT_B] |= (1 << PIN_7);
-    expected_port_int_polarity[PORT_A]  = 0x00;
-    expected_port_int_polarity[PORT_B]  = 0x00;
-    expected_port_int_polarity[PORT_B]  |= (1 << PIN_7);
-    expected_port_int_pullup[PORT_A]    = 0x00;
-    expected_port_int_pullup[PORT_B]    = 0x00;
-    expected_port_int_pullup[PORT_B]    |= (1 << PIN_3);
+    mcp23017_expander_image expected;
+    expected.port_int_control_reg[PORT_A]   = 0x00;
+    expected.port_int_control_reg[PORT_B]   = 0x00;
+    expected.port_int_control_reg[PORT_B]   |= (1 << PIN_3) | (1 << PIN_7);
+    expected.port_int_cmp_mode_reg[PORT_A]  = 0x00;
+    expected.port_int_cmp_mode_reg[PORT_B]  = 0x00;
+    expected.port_int_cmp_mode_reg[PORT_B]  |= (1 << PIN_3);
+    expected.port_int_cmp_value_reg[PORT_A] = 0x00;
+    expected.port_int_cmp_value_reg[PORT_B] = 0x00;
+    expected.port_int_cmp_value_reg[PORT_B] |= (1 << PIN_7);
+    expected.port_int_polarity_reg[PORT_A]  = 0x00;
+    expected.port_int_polarity_reg[PORT_B]  = 0x00;
+    expected.port_int_polarity_reg[PORT_B]  |= (1 << PIN_7);
+    expected.port_int_pullup_reg[PORT_A]    = 0x00;
+    expected.port_int_pullup_reg[PORT_B]    = 0x00;
+    expected.port_int_pullup_reg[PORT_B]    |= (1 << PIN_3);
 
     ON_CALL(*mockConfigI2C, writeI2C)
             .WillByDefault(testing::Return(STD_SUCCESS));
@@ -357,16 +354,16 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_1)
     mcp23017_expander_set_pin_int(&expander, PORT_B, PIN_7, &config_pin_7, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_int_control_reg_image[PORT_A],      expected_port_int_control[PORT_A]);
-    EXPECT_EQ(expander.port_int_control_reg_image[PORT_B],      expected_port_int_control[PORT_B]);
-    EXPECT_EQ(expander.port_int_cmp_mode_reg_image[PORT_A],     expected_port_int_cmp_mode[PORT_A]);
-    EXPECT_EQ(expander.port_int_cmp_mode_reg_image[PORT_B],     expected_port_int_cmp_mode[PORT_B]);
-    EXPECT_EQ(expander.port_int_cmp_value_reg_image[PORT_A],    expected_port_int_cmp_value[PORT_A]);
-    EXPECT_EQ(expander.port_int_cmp_value_reg_image[PORT_B],    expected_port_int_cmp_value[PORT_B]);
-    EXPECT_EQ(expander.port_int_polarity_reg_image[PORT_A],     expected_port_int_polarity[PORT_A]);
-    EXPECT_EQ(expander.port_int_polarity_reg_image[PORT_B],     expected_port_int_polarity[PORT_B]);
-    EXPECT_EQ(expander.port_int_pullup_reg_image[PORT_A],       expected_port_int_pullup[PORT_A]);
-    EXPECT_EQ(expander.port_int_pullup_reg_image[PORT_B],       expected_port_int_pullup[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_control_reg[PORT_A],      expected.port_int_control_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_int_control_reg[PORT_B],      expected.port_int_control_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_cmp_mode_reg[PORT_A],     expected.port_int_cmp_mode_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_int_cmp_mode_reg[PORT_B],     expected.port_int_cmp_mode_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_cmp_value_reg[PORT_A],    expected.port_int_cmp_value_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_int_cmp_value_reg[PORT_B],    expected.port_int_cmp_value_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_polarity_reg[PORT_A],     expected.port_int_polarity_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_int_polarity_reg[PORT_B],     expected.port_int_polarity_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_pullup_reg[PORT_A],       expected.port_int_pullup_reg[PORT_A]);
+    EXPECT_EQ(expander.image.port_int_pullup_reg[PORT_B],       expected.port_int_pullup_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_2)
@@ -379,16 +376,15 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_2)
     config_pin_3.polarity   = SAME_POLARITY;
     config_pin_3.pullup     = ENABLE_PULL_UP;
 
-    uint8_t expected_port_int_control[2], expected_port_int_cmp_mode[2], expected_port_int_cmp_value[2];
-    uint8_t expected_port_int_polarity[2], expected_port_int_pullup[2];
-    expected_port_int_control[PORT_B]   = 0x00;
-    expected_port_int_control[PORT_B]   |= (1 << PIN_3);
-    expected_port_int_cmp_mode[PORT_B]  = 0x00;
-    expected_port_int_cmp_mode[PORT_B]  |= (1 << PIN_3);
-    expected_port_int_cmp_value[PORT_B] = 0x00;
-    expected_port_int_polarity[PORT_B]  = 0x00;
-    expected_port_int_pullup[PORT_B]    = 0x00;
-    expected_port_int_pullup[PORT_B]    |= (1 << PIN_3);
+    mcp23017_expander_image expected;
+    expected.port_int_control_reg[PORT_B]   = 0x00;
+    expected.port_int_control_reg[PORT_B]   |= (1 << PIN_3);
+    expected.port_int_cmp_mode_reg[PORT_B]  = 0x00;
+    expected.port_int_cmp_mode_reg[PORT_B]  |= (1 << PIN_3);
+    expected.port_int_cmp_value_reg[PORT_B] = 0x00;
+    expected.port_int_polarity_reg[PORT_B]  = 0x00;
+    expected.port_int_pullup_reg[PORT_B]    = 0x00;
+    expected.port_int_pullup_reg[PORT_B]    |= (1 << PIN_3);
 
     uint16_t device_addr    = 0x20;
     uint16_t pullup_b_addr  = 0x0D;
@@ -398,27 +394,27 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_2)
     uint16_t polar_b_addr   = 0x03;
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, pullup_b_addr,
-                testing::_, testing::Pointee(expected_port_int_pullup[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_int_pullup_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, ctrl_b_addr,
-                testing::_, testing::Pointee(expected_port_int_cmp_mode[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_int_cmp_mode_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, def_b_addr,
-                testing::_, testing::Pointee(expected_port_int_cmp_value[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_int_cmp_value_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, enable_b_addr,
-                testing::_, testing::Pointee(expected_port_int_control[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_int_control_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
     EXPECT_CALL(*mockConfigI2C, writeI2C(device_addr, polar_b_addr,
-                testing::_, testing::Pointee(expected_port_int_polarity[PORT_B]), testing::_, testing::_, testing::_))
+                testing::_, testing::Pointee(expected.port_int_polarity_reg[PORT_B]), testing::_, testing::_, testing::_))
                 .Times(1)
                 .WillRepeatedly(testing::Return(STD_SUCCESS));
 
@@ -426,11 +422,11 @@ TEST_F(Mcp23017ExpanderTestFixture, SetPinInt_2)
     mcp23017_expander_set_pin_int(&expander, PORT_B, PIN_3, &config_pin_3, &error);
 
     // Assert: make unit test pass or fail
-    EXPECT_EQ(expander.port_int_control_reg_image[PORT_B],      expected_port_int_control[PORT_B]);
-    EXPECT_EQ(expander.port_int_cmp_mode_reg_image[PORT_B],     expected_port_int_cmp_mode[PORT_B]);
-    EXPECT_EQ(expander.port_int_cmp_value_reg_image[PORT_B],    expected_port_int_cmp_value[PORT_B]);
-    EXPECT_EQ(expander.port_int_polarity_reg_image[PORT_B],     expected_port_int_polarity[PORT_B]);
-    EXPECT_EQ(expander.port_int_pullup_reg_image[PORT_B],       expected_port_int_pullup[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_control_reg[PORT_B],      expected.port_int_control_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_cmp_mode_reg[PORT_B],     expected.port_int_cmp_mode_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_cmp_value_reg[PORT_B],    expected.port_int_cmp_value_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_polarity_reg[PORT_B],     expected.port_int_polarity_reg[PORT_B]);
+    EXPECT_EQ(expander.image.port_int_pullup_reg[PORT_B],       expected.port_int_pullup_reg[PORT_B]);
 }
 
 TEST_F(Mcp23017ExpanderTestFixture, GetPortIn)
