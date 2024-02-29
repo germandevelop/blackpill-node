@@ -50,8 +50,8 @@ static TaskHandle_t task;
 static SemaphoreHandle_t send_mutex;
 
 static tcp_client_config_t config;
-static tcp_msg_t send_msg_buffer;
-static tcp_msg_t recv_msg_buffer;
+static tcp_msg_t *send_msg_buffer;
+static tcp_msg_t *recv_msg_buffer;
 
 
 static void tcp_client_spi_lock ();
@@ -82,9 +82,6 @@ int tcp_client_init (tcp_client_config_t const * const init_config, std_error_t 
 
     memcpy((void*)(&config), (const void*)(init_config), sizeof(tcp_client_config_t));
 
-    send_msg_buffer.size = 0U;
-    recv_msg_buffer.size = 0U;
-
     return tcp_client_malloc(error);
 }
 
@@ -105,8 +102,8 @@ void tcp_client_send_message (tcp_msg_t const * const send_msg)
 
     xSemaphoreTake(send_mutex, portMAX_DELAY);
 
-    strncpy(send_msg_buffer.data, send_msg->data, send_msg->size);
-    send_msg_buffer.size = send_msg->size;
+    strncpy(send_msg_buffer->data, send_msg->data, send_msg->size);
+    send_msg_buffer->size = send_msg->size;
 
     xSemaphoreGive(send_mutex);
 
@@ -118,6 +115,9 @@ void tcp_client_send_message (tcp_msg_t const * const send_msg)
 void tcp_client_task (void *parameters)
 {
     UNUSED(parameters);
+
+    send_msg_buffer->size = 0U;
+    recv_msg_buffer->size = 0U;
     
     std_error_t error;
     std_error_init(&error);
@@ -152,8 +152,8 @@ void tcp_client_task (void *parameters)
 
             xSemaphoreTake(send_mutex, portMAX_DELAY);
 
-            const int32_t exit_code = send(W5500_SOCKET_NUMBER, (uint8_t*)send_msg_buffer.data, (uint16_t)send_msg_buffer.size);
-            send_msg_buffer.size = 0U;
+            const int32_t exit_code = send(W5500_SOCKET_NUMBER, (uint8_t*)send_msg_buffer->data, (uint16_t)send_msg_buffer->size);
+            send_msg_buffer->size = 0U;
 
             xSemaphoreGive(send_mutex);
 
@@ -352,12 +352,19 @@ int tcp_client_setup_w5500 (std_error_t * const error)
 
 int tcp_client_malloc (std_error_t * const error)
 {
+    send_msg_buffer = (tcp_msg_t*)pvPortMalloc(sizeof(tcp_msg_t));
+    recv_msg_buffer = (tcp_msg_t*)pvPortMalloc(sizeof(tcp_msg_t));
+
+    const bool are_buffers_allocated = (send_msg_buffer != NULL) && (recv_msg_buffer != NULL);
+
     send_mutex = xSemaphoreCreateMutex();
 
     const bool are_semaphores_allocated = (send_mutex != NULL);
 
-    if (are_semaphores_allocated != true)
+    if ((are_buffers_allocated != true) || (are_semaphores_allocated != true))
     {
+        vPortFree((void*)send_msg_buffer);
+        vPortFree((void*)recv_msg_buffer);
         vSemaphoreDelete(send_mutex);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);

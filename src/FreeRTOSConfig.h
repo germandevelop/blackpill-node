@@ -26,7 +26,7 @@ extern uint32_t SystemCoreClock;
 
 // Scheduler
 #define configUSE_PREEMPTION                    1
-#define configUSE_TIME_SLICING                  0
+#define configUSE_TIME_SLICING                  1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 1
 #define configIDLE_SHOULD_YIELD                 1
 
@@ -38,7 +38,7 @@ extern uint32_t SystemCoreClock;
 #define configTOTAL_HEAP_SIZE                     CONFIG_RTOS_HEAP_SIZE
 #define configSTACK_DEPTH_TYPE                    uint16_t
 #define configMINIMAL_STACK_SIZE                  ((uint16_t)128)
-#define configTIMER_TASK_STACK_DEPTH              ((uint16_t)512) // 512 * 4 = 2048 bytes
+#define configTIMER_TASK_STACK_DEPTH              ((uint16_t)1024) // 1024 * 4 = 4096 bytes
 
 // Hooks
 #define configUSE_IDLE_HOOK                 0
@@ -71,12 +71,12 @@ extern uint32_t SystemCoreClock;
 #define configUSE_MUTEXES                 1
 #define configUSE_RECURSIVE_MUTEXES       0
 #define configUSE_COUNTING_SEMAPHORES     0
-#define configUSE_QUEUE_SETS              0
+#define configUSE_QUEUE_SETS              1
 #define configMESSAGE_BUFFER_LENGTH_TYPE  size_t
 
 // Timers
 #define configUSE_TIMERS              1
-#define configTIMER_TASK_PRIORITY     (2)
+#define configTIMER_TASK_PRIORITY     (0)
 #define configTIMER_QUEUE_LENGTH      16
 
 // Co-routines

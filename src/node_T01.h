@@ -71,15 +71,15 @@ void node_T01_process_humidity (node_T01_t * const self,
                                 node_T01_humidity_t const * const data,
                                 uint32_t * const next_time_ms);
 
-void node_T01_process_reed_switch ( node_T01_t * const self,
-                                    bool is_reed_switch_open,
+void node_T01_process_door_state (  node_T01_t * const self,
+                                    bool is_door_open,
                                     uint32_t * const next_time_ms);
 
 void node_T01_process_remote_button (node_T01_t * const self,
                                     board_remote_button_t remote_button);
 
-void node_T01_process_front_pir (node_T01_t * const self,
-                                uint32_t time_ms);
+void node_T01_process_front_movement (  node_T01_t * const self,
+                                        uint32_t time_ms);
 
 void node_T01_get_light_data (  node_T01_t const * const self,
                                 uint32_t * const disable_time_ms);

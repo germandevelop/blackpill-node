@@ -167,19 +167,23 @@ int mcp23017_expander_get_int_capture ( mcp23017_expander_t * const self,
 
 
 // Private
+typedef struct mcp23017_expander_image
+{
+    uint8_t config_reg;
+    uint8_t port_direction_reg[2];
+    uint8_t port_out_reg[2];
+    uint8_t port_int_control_reg[2];
+    uint8_t port_int_cmp_mode_reg[2];
+    uint8_t port_int_cmp_value_reg[2];
+    uint8_t port_int_polarity_reg[2];
+    uint8_t port_int_pullup_reg[2];
+
+} mcp23017_expander_image_t;
+
 typedef struct mcp23017_expander
 {
     mcp23017_expander_config_t config;
-
-    // Register images
-    uint8_t config_reg_image;
-    uint8_t port_direction_reg_image[2];
-    uint8_t port_out_reg_image[2];
-    uint8_t port_int_control_reg_image[2];
-    uint8_t port_int_cmp_mode_reg_image[2];
-    uint8_t port_int_cmp_value_reg_image[2];
-    uint8_t port_int_polarity_reg_image[2];
-    uint8_t port_int_pullup_reg_image[2];
+    mcp23017_expander_image_t image;
 
 } mcp23017_expander_t;
 

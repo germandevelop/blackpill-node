@@ -29,12 +29,11 @@
 #include "std_error/std_error.h"
 
 
-#define RTOS_TASK_STACK_SIZE    1024U       // 1024*4=4096 bytes
-#define RTOS_TASK_PRIORITY      0U          // 0 - lowest, 4 - highest
+#define RTOS_TASK_STACK_SIZE    512U        // 512*4=2048 bytes
+#define RTOS_TASK_PRIORITY      1U          // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "board_T01" // 16 - max length
 
 #define RTOS_TIMER_TICKS_TO_WAIT    (1U * 1000U)
-#define REMOTE_BUTTON_QUEUE_SIZE    4U
 #define PIR_HYSTERESIS_MS           (1U * 1000U) // 1 sec
 
 #define DEFAULT_ERROR_TEXT  "Board T01 error"
@@ -156,7 +155,7 @@ void board_T01_task (void *parameters)
         if ((notification & FRONT_PIR_NOTIFICATION) != 0U)
         {
             xSemaphoreTake(node_mutex, portMAX_DELAY);
-            node_T01_process_front_pir(node, tick_count_ms);
+            node_T01_process_front_movement(node, tick_count_ms);
             xSemaphoreGive(node_mutex);
         }
 
@@ -361,10 +360,17 @@ void board_T01_reed_switch_timer (TimerHandle_t timer)
     bool is_reed_switch_open = false;
     // **************************************
 
+    bool is_door_open = false;
+
+    if (is_reed_switch_open == true)
+    {
+        is_door_open = true;
+    }
+
     uint32_t next_time_ms;
 
     xSemaphoreTake(node_mutex, portMAX_DELAY);
-    node_T01_process_reed_switch(node, is_reed_switch_open, &next_time_ms);
+    node_T01_process_door_state(node, is_door_open, &next_time_ms);
     xSemaphoreGive(node_mutex);
 
     xTimerChangePeriod(reed_switch_timer, next_time_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);

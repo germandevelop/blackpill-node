@@ -54,62 +54,62 @@ int mcp23017_expander_init (mcp23017_expander_t * const self,
     mcp23017_expander_set_config(self, init_config);
 
     // Initial values of registers according to the datasheet
-    self->port_direction_reg_image[PORT_A]      = 0xFF;
-    self->port_direction_reg_image[PORT_B]      = 0xFF;
-    self->port_out_reg_image[PORT_A]            = 0x00;
-    self->port_out_reg_image[PORT_B]            = 0x00;
-    self->port_int_control_reg_image[PORT_A]    = 0x00;
-    self->port_int_control_reg_image[PORT_B]    = 0x00;
-    self->port_int_cmp_mode_reg_image[PORT_A]   = 0x00;
-    self->port_int_cmp_mode_reg_image[PORT_B]   = 0x00;
-    self->port_int_cmp_value_reg_image[PORT_A]  = 0x00;
-    self->port_int_cmp_value_reg_image[PORT_B]  = 0x00;
-    self->port_int_polarity_reg_image[PORT_A]   = 0x00;
-    self->port_int_polarity_reg_image[PORT_B]   = 0x00;
-    self->port_int_pullup_reg_image[PORT_A]     = 0x00;
-    self->port_int_pullup_reg_image[PORT_B]     = 0x00;
+    self->image.port_direction_reg[PORT_A]      = 0xFF;
+    self->image.port_direction_reg[PORT_B]      = 0xFF;
+    self->image.port_out_reg[PORT_A]            = 0x00;
+    self->image.port_out_reg[PORT_B]            = 0x00;
+    self->image.port_int_control_reg[PORT_A]    = 0x00;
+    self->image.port_int_control_reg[PORT_B]    = 0x00;
+    self->image.port_int_cmp_mode_reg[PORT_A]   = 0x00;
+    self->image.port_int_cmp_mode_reg[PORT_B]   = 0x00;
+    self->image.port_int_cmp_value_reg[PORT_A]  = 0x00;
+    self->image.port_int_cmp_value_reg[PORT_B]  = 0x00;
+    self->image.port_int_polarity_reg[PORT_A]   = 0x00;
+    self->image.port_int_polarity_reg[PORT_B]   = 0x00;
+    self->image.port_int_pullup_reg[PORT_A]     = 0x00;
+    self->image.port_int_pullup_reg[PORT_B]     = 0x00;
 
-    self->config_reg_image = 0x00;
+    self->image.config_reg = 0x00;
 
     // Unimplemented(bit 0): Read as "0"
-    self->config_reg_image |= (0 << 0);
+    self->image.config_reg |= (0 << 0);
 
     // INTPOL(bit 1): This bit sets the polarity of the INT output pin
     // 1 = Active-high
     // 0 = Active-low
-    self->config_reg_image |= (1 << 1);
+    self->image.config_reg |= (1 << 1);
 
     // ODR(bit 2): Configures the INT pin as an open-drain output
     // 1 = Open-drain output (overrides the INTPOL bit)
     // 0 = Active driver output (Push-Pull) (INTPOL bit sets the polarity)
-    self->config_reg_image |= (0 << 2);
+    self->image.config_reg |= (0 << 2);
 
     // HAEN(bit 3): Hardware Address Enable bit (MCP23S17 only)
     // 1 = Enables the MCP23S17 address pins
     // 0 = Disables the MCP23S17 address pins
-    self->config_reg_image |= (0 << 3);
+    self->image.config_reg |= (0 << 3);
 
     // DISSLW(bit 4): Slew Rate control bit for SDA output
     // 1 = Slew rate disabled
     // 0 = Slew rate enabled
-    self->config_reg_image |= (1 << 4);
+    self->image.config_reg |= (1 << 4);
 
     // SEQOP(bit 5): Sequential Operation mode bit
     // 1 = Sequential operation disabled, address pointer does not increment
     // 0 = Sequential operation enabled, address pointer increments
-    self->config_reg_image |= (0 << 5);
+    self->image.config_reg |= (0 << 5);
 
     // MIRROR(bit 6): INT Pins Mirror bit
     // 1 = The INT pins are internally connected
     // 0 = The INT pins are not connected. INTA is associated with PORTA and INTB is associated with PORTB
-    self->config_reg_image |= (1 << 6);
+    self->image.config_reg |= (1 << 6);
 
     // BANK(bit 7): Controls how the registers are addressed
     // 1 = The registers associated with each port are separated into different banks
     // 0 = The registers are in the same bank (addresses are sequential)
-    self->config_reg_image |= (0 << 7);
+    self->image.config_reg |= (0 << 7);
 
-    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, MCP23017_CONFIGURATION_REGISTER_ADDRESS, sizeof(uint8_t), &self->config_reg_image, sizeof(self->config_reg_image), self->config.i2c_timeout_ms, error);
+    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, MCP23017_CONFIGURATION_REGISTER_ADDRESS, sizeof(uint8_t), &self->image.config_reg, sizeof(self->image.config_reg), self->config.i2c_timeout_ms, error);
 }
 
 void mcp23017_expander_set_config ( mcp23017_expander_t * const self,
@@ -141,14 +141,14 @@ int mcp23017_expander_set_port_direction (  mcp23017_expander_t * const self,
 
     if (direction == OUTPUT_DIRECTION)
     {
-        self->port_direction_reg_image[port] = 0x00;
+        self->image.port_direction_reg[port] = 0x00;
     }
     else
     {
-        self->port_direction_reg_image[port] = 0xFF;
+        self->image.port_direction_reg[port] = 0xFF;
     }
 
-    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_direction_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_direction_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 }
 
 int mcp23017_expander_set_pin_direction (mcp23017_expander_t * const self,
@@ -168,14 +168,14 @@ int mcp23017_expander_set_pin_direction (mcp23017_expander_t * const self,
 
     if (direction == OUTPUT_DIRECTION)
     {
-        self->port_direction_reg_image[port] &= ~(1 << pin);
+        self->image.port_direction_reg[port] &= ~(1 << pin);
     }
     else
     {
-        self->port_direction_reg_image[port] |= (1 << pin);
+        self->image.port_direction_reg[port] |= (1 << pin);
     }
 
-    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_direction_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_direction_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 }
 
 int mcp23017_expander_set_port_out (mcp23017_expander_t * const self,
@@ -194,14 +194,14 @@ int mcp23017_expander_set_port_out (mcp23017_expander_t * const self,
 
     if (gpio == LOW_GPIO)
     {
-        self->port_out_reg_image[port] = 0x00;
+        self->image.port_out_reg[port] = 0x00;
     }
     else
     {
-        self->port_out_reg_image[port] = 0xFF;
+        self->image.port_out_reg[port] = 0xFF;
     }
 
-    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_out_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_out_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 }
 
 int mcp23017_expander_set_pin_out ( mcp23017_expander_t * const self,
@@ -221,14 +221,14 @@ int mcp23017_expander_set_pin_out ( mcp23017_expander_t * const self,
 
     if (gpio == LOW_GPIO)
     {
-        self->port_out_reg_image[port] &= ~(1 << pin);
+        self->image.port_out_reg[port] &= ~(1 << pin);
     }
     else
     {
-        self->port_out_reg_image[port] |= (1 << pin);
+        self->image.port_out_reg[port] |= (1 << pin);
     }
 
-    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_out_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+    return self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_out_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 }
 
 int mcp23017_expander_get_port_in ( mcp23017_expander_t const * const self,
@@ -276,14 +276,14 @@ int mcp23017_expander_set_pin_int ( mcp23017_expander_t * const self,
 
         if (config->cmp_mode == DISABLE_COMPARISON)
         {
-            self->port_int_cmp_mode_reg_image[port] &= ~(1 << pin);
+            self->image.port_int_cmp_mode_reg[port] &= ~(1 << pin);
         }
         else
         {
-            self->port_int_cmp_mode_reg_image[port] |= (1 << pin);
+            self->image.port_int_cmp_mode_reg[port] |= (1 << pin);
         }
 
-        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_int_cmp_mode_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_int_cmp_mode_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 
         if (exit_code != STD_SUCCESS)
         {
@@ -301,14 +301,14 @@ int mcp23017_expander_set_pin_int ( mcp23017_expander_t * const self,
 
         if (config->cmp_value == LOW_COMPARISON_VALUE)
         {
-            self->port_int_cmp_value_reg_image[port] &= ~(1 << pin);
+            self->image.port_int_cmp_value_reg[port] &= ~(1 << pin);
         }
         else
         {
-            self->port_int_cmp_value_reg_image[port] |= (1 << pin);
+            self->image.port_int_cmp_value_reg[port] |= (1 << pin);
         }
 
-        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_int_cmp_value_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_int_cmp_value_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 
         if (exit_code != STD_SUCCESS)
         {
@@ -326,14 +326,14 @@ int mcp23017_expander_set_pin_int ( mcp23017_expander_t * const self,
 
         if (config->polarity == SAME_POLARITY)
         {
-            self->port_int_polarity_reg_image[port] &= ~(1 << pin);
+            self->image.port_int_polarity_reg[port] &= ~(1 << pin);
         }
         else
         {
-            self->port_int_polarity_reg_image[port] |= (1 << pin);
+            self->image.port_int_polarity_reg[port] |= (1 << pin);
         }
 
-        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_int_polarity_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_int_polarity_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 
         if (exit_code != STD_SUCCESS)
         {
@@ -351,14 +351,14 @@ int mcp23017_expander_set_pin_int ( mcp23017_expander_t * const self,
 
         if (config->pullup == DISABLE_PULL_UP)
         {
-            self->port_int_pullup_reg_image[port] &= ~(1 << pin);
+            self->image.port_int_pullup_reg[port] &= ~(1 << pin);
         }
         else
         {
-            self->port_int_pullup_reg_image[port] |= (1 << pin);
+            self->image.port_int_pullup_reg[port] |= (1 << pin);
         }
 
-        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_int_pullup_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_int_pullup_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 
         if (exit_code != STD_SUCCESS)
         {
@@ -376,14 +376,14 @@ int mcp23017_expander_set_pin_int ( mcp23017_expander_t * const self,
 
         if (config->control == DISABLE_INTERRUPT)
         {
-            self->port_int_control_reg_image[port] &= ~(1 << pin);
+            self->image.port_int_control_reg[port] &= ~(1 << pin);
         }
         else
         {
-            self->port_int_control_reg_image[port] |= (1 << pin);
+            self->image.port_int_control_reg[port] |= (1 << pin);
         }
 
-        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->port_int_control_reg_image[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
+        exit_code = self->config.write_i2c_callback(MCP23017_DEVICE_ADDRESS, register_address[port], sizeof(uint8_t), &self->image.port_int_control_reg[port], sizeof(uint8_t), self->config.i2c_timeout_ms, error);
 
         if (exit_code != STD_SUCCESS)
         {

@@ -229,8 +229,8 @@ void node_T01_process_humidity (node_T01_t * const self,
     return;
 }
 
-void node_T01_process_reed_switch ( node_T01_t * const self,
-                                    bool is_reed_switch_open,
+void node_T01_process_door_state (  node_T01_t * const self,
+                                    bool is_door_open,
                                     uint32_t * const next_time_ms)
 {
     assert(self         != NULL);
@@ -238,14 +238,7 @@ void node_T01_process_reed_switch ( node_T01_t * const self,
 
     *next_time_ms = NODE_T01_DOOR_STATE_PERIOD_MS;
 
-    if (is_reed_switch_open == true)
-    {
-        self->is_door_open = true;
-    }
-    else
-    {
-        self->is_door_open = false;
-    }
+    self->is_door_open = is_door_open;
 
     if (self->send_msg_buffer_size != ARRAY_SIZE(self->send_msg_buffer))
     {
@@ -286,8 +279,8 @@ void node_T01_process_remote_button (node_T01_t * const self,
     return;
 }
 
-void node_T01_process_front_pir (node_T01_t * const self,
-                                uint32_t time_ms)
+void node_T01_process_front_movement (  node_T01_t * const self,
+                                        uint32_t time_ms)
 {
     assert(self != NULL);
 
