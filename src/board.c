@@ -5,12 +5,15 @@
 
 #include "board.h"
 
+#include <limits.h>
 #include <assert.h>
 
 #include "stm32f4xx_hal.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
+#include "timers.h"
 
 #include "lfs.h"
 
@@ -40,8 +43,13 @@
 #define RTOS_TASK_PRIORITY      4U      // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "board" // 16 - max length
 
-#define LUMINOSITY_MEAUSEREMENT_COUNT       5U
-#define LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS  (2U * 1000U)
+#define RTOS_TIMER_TICKS_TO_WAIT  (1U * 1000U)
+
+#define STATUS_LED_NOTIFICATION     (1 << 0)
+#define REMOTE_BUTTON_NOTIFICATION  (1 << 1)
+
+#define DEFAULT_ERROR_TEXT  "Board error"
+#define MALLOC_ERROR_TEXT   "Board memory allocation error"
 
 #define LFS_MIN_READ_BLOCK_SIZE 16U
 #define LFS_MIN_PROG_BLOCK_SIZE 16U
@@ -49,19 +57,25 @@
 #define LFS_CACHE_SIZE          512U
 #define LFS_LOOKAHEAD_SIZE      128U
 
-#define DEFAULT_ERROR_TEXT  "Board error"
-#define MALLOC_ERROR_TEXT   "Board memory allocation error"
+#define LUMINOSITY_MEAUSEREMENT_COUNT       5U
+#define LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS  (2U * 1000U)
 
+#define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 
 static TaskHandle_t task;
+static SemaphoreHandle_t status_led_mutex;
+static SemaphoreHandle_t remote_button_mutex;
+static TimerHandle_t luminosity_timer;
 
 static board_config_t config;
 
 static mcp23017_expander_t mcp23017_expander;
 static w25q32bv_flash_t w25q32bv_flash;
 static vs1838_control_t vs1838_control;
+static board_led_color_t status_led_color;
+static board_remote_button_t latest_remote_button;
 
 static uint8_t lfs_read_buffer[LFS_CACHE_SIZE];
 static uint8_t lfs_prog_buffer[LFS_CACHE_SIZE];
@@ -71,6 +85,7 @@ static uint8_t lfs_lookahead_buffer[LFS_LOOKAHEAD_SIZE];
 
 static int board_malloc (std_error_t * const error);
 static void board_task (void *parameters);
+static void board_luminosity_timer (TimerHandle_t timer);
 
 static void board_init_logger ();
 static void board_init_filesystem ();
@@ -93,8 +108,9 @@ static void board_i2c_1_unlock ();
 
 static void board_timer_2_ic_isr_callback (uint32_t captured_value);
 
-static int board_set_led_color (board_led_color_t led_color, std_error_t * const error);
-static int board_get_luminosity (uint32_t * const luminosity_adc, std_error_t * const error);
+static void board_update_status_led (board_led_color_t led_color);
+static int board_set_status_led_color (board_led_color_t led_color, std_error_t * const error);
+static int board_read_luminosity (uint32_t * const luminosity_adc, std_error_t * const error);
 
 static int board_lfs_block_device_read (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, void *raw_data, lfs_size_t size);
 static int board_lfs_block_device_prog (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, const void *raw_data, lfs_size_t size);
@@ -123,15 +139,10 @@ void board_task (void *parameters)
 {
     UNUSED(parameters);
 
-    {
-        board_T01_config_t config;
-        config.mcp23017_expander = &mcp23017_expander;
-        config.w25q32bv_flash = &w25q32bv_flash;
-        config.set_led_color_callback = NULL;
-        config.get_luminosity_callback = NULL;
+    std_error_t error;
+    std_error_init(&error);
 
-        board_T01_init(&config, NULL);
-    }
+    status_led_color = NO_COLOR;
 
     board_init_expander();
     board_init_filesystem();
@@ -139,12 +150,9 @@ void board_task (void *parameters)
     board_init_remote_control();
 
     {
-        std_error_t error;
-        std_error_init(&error);
-
         node_config_t config;
         config.id                       = NODE_T01;
-        config.receive_msg_callback     = board_T01_receive_node_msg;
+        config.receive_msg_callback     = board_T01_process_rcv_node_msg;
         config.send_tcp_msg_callback    = tcp_client_send_message;
 
         if (node_init(&config, &error) != STD_SUCCESS)
@@ -154,14 +162,10 @@ void board_task (void *parameters)
     }
 
     {
-        std_error_t error;
-        std_error_init(&error);
-
         board_T01_config_t config;
         config.mcp23017_expander        = &mcp23017_expander;
         config.w25q32bv_flash           = &w25q32bv_flash;
-        config.set_led_color_callback   = board_set_led_color;
-        config.get_luminosity_callback  = board_get_luminosity;
+        config.update_status_led_callback = board_update_status_led;
         config.send_node_msg_callback   = node_send_msg;
 
         if (board_T01_init(&config, &error) != STD_SUCCESS)
@@ -172,25 +176,38 @@ void board_task (void *parameters)
 
     while (true)
     {
-        vTaskDelay(config.watchdog_timeout_ms);
+        uint32_t notification;
+        xTaskNotifyWait(0U, ULONG_MAX, &notification, config.watchdog_timeout_ms);
+
+        if ((notification & STATUS_LED_NOTIFICATION) != 0U)
+        {
+            board_led_color_t current_led_color;
+
+            xSemaphoreTake(status_led_mutex, portMAX_DELAY);
+            current_led_color = status_led_color;
+            xSemaphoreGive(status_led_mutex);
+
+            if (board_set_status_led_color(current_led_color, &error) != STD_SUCCESS)
+            {
+                LOG("Board : %s\r\n", error.text);
+            }
+        }
+
+        if ((notification & REMOTE_BUTTON_NOTIFICATION) != 0U)
+        {
+            board_remote_button_t current_remote_button;
+
+            xSemaphoreTake(remote_button_mutex, portMAX_DELAY);
+            current_remote_button = latest_remote_button;
+            xSemaphoreGive(remote_button_mutex);
+
+            board_T01_process_remote_button(current_remote_button);
+        }
 
         LOG("Board : feed watchdog\r\n");
         config.refresh_watchdog_callback();
     }
     return;
-}
-
-int board_malloc (std_error_t * const error)
-{
-    BaseType_t exit_code = xTaskCreate(board_task, RTOS_TASK_NAME, RTOS_TASK_STACK_SIZE, NULL, RTOS_TASK_PRIORITY, &task);
-
-    if (exit_code != pdPASS)
-    {
-        std_error_catch_custom(error, (int)exit_code, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
-
-        return STD_FAILURE;
-    }
-    return STD_SUCCESS;
 }
 
 
@@ -216,7 +233,7 @@ void board_init_filesystem ()
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Init SPI_1\r\n");
+    LOG("Board : Init SPI_1\r\n");
 
     board_spi_1_init_select_gpio();
     int exit_code = board_spi_1_init(&error);
@@ -228,7 +245,7 @@ void board_init_filesystem ()
         return;
     }
 
-    LOG("Init Flash (W25Q32BV)\r\n");
+    LOG("Board : Init Flash (W25Q32BV)\r\n");
     
     w25q32bv_flash_config_t w25q32bv_flash_config;
     w25q32bv_flash_config.spi_select_callback   = board_w25q32bv_spi_1_select;
@@ -242,7 +259,7 @@ void board_init_filesystem ()
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
 
         return;
     }
@@ -297,18 +314,18 @@ void board_init_tcp_client ()
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Init EXTI_1\r\n");
+    LOG("Board : Init EXTI_1\r\n");
 
     int exit_code = board_exti_1_init(tcp_client_ISR, &error);
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
 
         return;
     }
 
-    LOG("Init TCP-Client\r\n");
+    LOG("Board : Init TCP-Client\r\n");
 
     tcp_client_config_t tcp_client_config = { 0 };
 
@@ -345,7 +362,7 @@ void board_init_tcp_client ()
 
     if (tcp_client_init(&tcp_client_config, &error) != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
     return;
 }
@@ -355,18 +372,18 @@ void board_init_expander ()
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Init I2C_1\r\n");
+    LOG("Board : Init I2C_1\r\n");
 
     int exit_code = board_i2c_1_init(&error);
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
 
         return;
     }
 
-    LOG("Init Expander (MCP23017)\r\n");
+    LOG("Board : Init Expander (MCP23017)\r\n");
 
     mcp23017_expander_config_t config;
     config.write_i2c_callback   = board_i2c_1_write_register;
@@ -375,25 +392,25 @@ void board_init_expander ()
 
     if (mcp23017_expander_init(&mcp23017_expander, &config, &error) != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
 
     if (mcp23017_expander_set_port_direction(&mcp23017_expander, PORT_A, OUTPUT_DIRECTION, &error) != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
     if (mcp23017_expander_set_port_out(&mcp23017_expander, PORT_A, LOW_GPIO, &error) != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
 
     if (mcp23017_expander_set_port_direction(&mcp23017_expander, PORT_B, OUTPUT_DIRECTION, &error) != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
     if (mcp23017_expander_set_port_out(&mcp23017_expander, PORT_B, LOW_GPIO, &error) != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
 
     return;
@@ -404,7 +421,7 @@ void board_init_remote_control ()
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Init Remote control (VS1838)\r\n");
+    LOG("Board : Init Remote control (VS1838)\r\n");
 
     vs1838_control_config_t config;
     config.start_bit    = 1155U;
@@ -414,7 +431,7 @@ void board_init_remote_control ()
 
     vs1838_control_init(&vs1838_control, &config);
 
-    LOG("Init TIMER_2\r\n");
+    LOG("Board : Init TIMER_2\r\n");
 
     board_timer_2_config_t timer_2_config;
     timer_2_config.ic_isr_callback = board_timer_2_ic_isr_callback;
@@ -423,21 +440,20 @@ void board_init_remote_control ()
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
 
-    LOG("Init TIMER_3\r\n");
+    LOG("Board : Init TIMER_3\r\n");
 
     exit_code = board_timer_3_init(&error);
     board_timer_3_deinit();
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
     return;
 }
-
 
 
 void board_print_uart_2 (const uint8_t *data, uint16_t data_size)
@@ -574,12 +590,40 @@ void board_timer_2_ic_isr_callback (uint32_t captured_value)
             }
         }
 
-        board_T01_remote_control_ISR(remote_button);
+        BaseType_t is_higher_priority_task_woken;
+
+        xSemaphoreTakeFromISR(remote_button_mutex, &is_higher_priority_task_woken);
+        latest_remote_button = remote_button;
+        xSemaphoreGiveFromISR(remote_button_mutex, &is_higher_priority_task_woken);
+
+        xTaskNotifyFromISR(task, REMOTE_BUTTON_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
+
+        portYIELD_FROM_ISR(is_higher_priority_task_woken);
     }
     return;
 }
 
-int board_set_led_color (board_led_color_t led_color, std_error_t * const error)
+void board_update_status_led (board_led_color_t led_color)
+{
+    board_led_color_t current_led_color;
+
+    xSemaphoreTake(status_led_mutex, portMAX_DELAY);
+    current_led_color = status_led_color;
+    xSemaphoreGive(status_led_mutex);
+
+    if (led_color != current_led_color)
+    {
+        xSemaphoreTake(status_led_mutex, portMAX_DELAY);
+        status_led_color = led_color;
+        xSemaphoreGive(status_led_mutex);
+
+        xTaskNotify(task, STATUS_LED_NOTIFICATION, eSetBits);
+    }
+
+    return;
+}
+
+int board_set_status_led_color (board_led_color_t led_color, std_error_t * const error)
 {
     board_timer_2_stop_channel_2(); // Green
     board_timer_3_deinit();         // Red + Blue
@@ -609,13 +653,63 @@ int board_set_led_color (board_led_color_t led_color, std_error_t * const error)
     return exit_code;
 }
 
-int board_get_luminosity (uint32_t * const luminosity_adc, std_error_t * const error)
+void board_luminosity_timer (TimerHandle_t timer)
+{
+    UNUSED(timer);
+
+    std_error_t error;
+    std_error_init(&error);
+
+    bool is_timer_started = false;
+
+    bool is_lightning_on;
+    board_T01_get_lightning_status(&is_lightning_on);
+
+    if (is_lightning_on != true)
+    {
+        if (board_set_status_led_color(NO_COLOR, &error) == STD_SUCCESS)
+        {
+            vTaskDelay(1U * 1000U);
+
+            uint32_t luminosity_adc = 0U;
+
+            if (board_read_luminosity(&luminosity_adc, &error) != STD_FAILURE)
+            {
+                LOG("Board : luminosity adc = %lu\r\n", luminosity_adc);
+
+                uint32_t timer_period_ms;
+                board_T01_process_luminosity(luminosity_adc, &timer_period_ms);
+
+                xTimerChangePeriod(luminosity_timer, timer_period_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+            }
+            else
+            {
+                LOG("Board : %s\r\n", error.text);
+            }
+        }
+        else
+        {
+            LOG("Board : %s\r\n", error.text);
+        }
+    }
+
+    if (is_timer_started != true)
+    {
+        xTimerStart(luminosity_timer, RTOS_TIMER_TICKS_TO_WAIT);
+    }
+
+    xTaskNotify(task, STATUS_LED_NOTIFICATION, eSetBits);
+
+    return;
+}
+
+int board_read_luminosity (uint32_t * const luminosity_adc, std_error_t * const error)
 {
     int exit_code = board_adc_1_init(error);
 
     if (exit_code == STD_SUCCESS)
     {
-        uint32_t luminosity_buffer = 0U;
+        uint32_t luminosity_buffer      = 0U;
         uint32_t luminosity_buffer_size = 0U;
 
         for (size_t i = 0U; i < LUMINOSITY_MEAUSEREMENT_COUNT; ++i)
@@ -643,6 +737,40 @@ int board_get_luminosity (uint32_t * const luminosity_adc, std_error_t * const e
 
     return exit_code;
 }
+
+int board_malloc (std_error_t * const error)
+{
+    status_led_mutex    = xSemaphoreCreateMutex();
+    remote_button_mutex = xSemaphoreCreateMutex();
+
+    const bool are_semaphores_allocated = (status_led_mutex != NULL) && (remote_button_mutex != NULL);
+
+    luminosity_timer = xTimerCreate("luminosity", 0U, pdFALSE, NULL, board_luminosity_timer);
+
+    const bool are_timers_allocated = (luminosity_timer != NULL);
+
+    if ((are_semaphores_allocated != true) || (are_timers_allocated != true))
+    {
+        vSemaphoreDelete(status_led_mutex);
+        vSemaphoreDelete(remote_button_mutex);
+        xTimerDelete(luminosity_timer, RTOS_TIMER_TICKS_TO_WAIT);
+
+        std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
+
+        return STD_FAILURE;
+    }
+
+    BaseType_t exit_code = xTaskCreate(board_task, RTOS_TASK_NAME, RTOS_TASK_STACK_SIZE, NULL, RTOS_TASK_PRIORITY, &task);
+
+    if (exit_code != pdPASS)
+    {
+        std_error_catch_custom(error, (int)exit_code, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
+
+        return STD_FAILURE;
+    }
+    return STD_SUCCESS;
+}
+
 
 
 int board_lfs_block_device_read (const struct lfs_config *config,

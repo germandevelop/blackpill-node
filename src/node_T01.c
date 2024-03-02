@@ -18,6 +18,7 @@
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 
+static void node_T01_update_time (node_T01_t * const self, uint32_t time_ms);
 static void node_T01_update_state (node_T01_t * const self, uint32_t time_ms);
 
 void node_T01_init (node_T01_t * const self)
@@ -57,13 +58,24 @@ void node_T01_get_state (node_T01_t * const self,
     return;
 }
 
+void node_T01_update_time (node_T01_t * const self, uint32_t time_ms)
+{
+    if (self->light_and_display_start_time_ms > time_ms)
+    {
+        self->light_and_display_start_time_ms = 0U;
+    }
+
+    return;
+}
+
 void node_T01_update_state (node_T01_t * const self,
                             uint32_t time_ms)
 {
     assert(self != NULL);
 
     // Update light and display state
-    const uint32_t duration_ms = time_ms - self->light_and_display_start_time_ms;
+    node_T01_update_time(self, time_ms);
+    const uint32_t light_and_display_duration_ms = time_ms - self->light_and_display_start_time_ms;
 
     if (self->mode == ALARM)
     {
@@ -81,7 +93,7 @@ void node_T01_update_state (node_T01_t * const self,
 
     else if (self->mode == GUARD)
     {
-        if (duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
+        if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
         {
             self->state.is_light_on = false;
         }
@@ -102,7 +114,7 @@ void node_T01_update_state (node_T01_t * const self,
 
     else if (self->mode == SILENCE)
     {
-        if (duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
+        if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
         {
             self->state.is_light_on     = false;
             self->state.is_display_on   = false;
@@ -284,9 +296,10 @@ void node_T01_process_front_movement (  node_T01_t * const self,
 {
     assert(self != NULL);
 
-    const uint32_t duration_ms = time_ms - self->light_and_display_start_time_ms;
+    node_T01_update_time(self, time_ms);
+    const uint32_t light_and_display_duration_ms = time_ms - self->light_and_display_start_time_ms;
 
-    if (duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
+    if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
     {
         self->light_and_display_start_time_ms = time_ms;
 
@@ -330,6 +343,58 @@ void node_T01_process_front_movement (  node_T01_t * const self,
     return;
 }
 
+void node_T01_process_rcv_msg ( node_T01_t * const self,
+                                node_msg_t const * const rcv_msg,
+                                uint32_t time_ms)
+{
+    assert(self     != NULL);
+    assert(rcv_msg  != NULL);
+
+    node_T01_update_time(self, time_ms);
+    const uint32_t light_and_display_duration_ms = time_ms - self->light_and_display_start_time_ms;
+
+    if (rcv_msg->cmd_id == SET_MODE)
+    {
+        self->mode = (node_mode_id_t)(rcv_msg->value_0);
+
+        self->light_and_display_start_time_ms = 0U;
+    }
+    else if (rcv_msg->cmd_id == SET_INTRUSION) 
+    {
+        const node_intrusion_id_t intrusion_id = (node_intrusion_id_t)(rcv_msg->value_0);
+
+        if (intrusion_id == INTRUSION_ON)
+        {
+            if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
+            {
+                self->light_and_display_start_time_ms = time_ms;
+            }
+        }
+        else if (intrusion_id == INTRUSION_OFF)
+        {
+            self->light_and_display_start_time_ms = 0U;
+        }
+    }
+    else if (rcv_msg->cmd_id == SET_LIGHT) 
+    {
+        const node_light_id_t light_id = (node_light_id_t)(rcv_msg->value_0);
+
+        if (light_id == LIGHT_ON)
+        {
+            if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
+            {
+                self->light_and_display_start_time_ms = time_ms;
+            }
+        }
+        else if (light_id == LIGHT_OFF)
+        {
+            self->light_and_display_start_time_ms = 0U;
+        }
+    }
+
+    return;
+}
+
 void node_T01_get_light_data (  node_T01_t const * const self,
                                 uint32_t * const disable_time_ms)
 {
@@ -352,59 +417,6 @@ void node_T01_get_display_data (node_T01_t const * const self,
     *disable_time_ms = NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS;
 
     *data = self->humidity;
-
-    return;
-}
-
-void node_T01_process_rcv_msg ( node_T01_t * const self,
-                                node_msg_t const * const rcv_msg,
-                                uint32_t time_ms)
-{
-    assert(self     != NULL);
-    assert(rcv_msg  != NULL);
-
-    if (rcv_msg->cmd_id == SET_MODE)
-    {
-        self->mode = (node_mode_id_t)(rcv_msg->value_0);
-
-        self->light_and_display_start_time_ms = 0U;
-    }
-    else if (rcv_msg->cmd_id == SET_INTRUSION) 
-    {
-        const node_intrusion_id_t intrusion_id = (node_intrusion_id_t)(rcv_msg->value_0);
-
-        if (intrusion_id == INTRUSION_ON)
-        {
-            const uint32_t duration_ms = time_ms - self->light_and_display_start_time_ms;
-
-            if (duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
-            {
-                self->light_and_display_start_time_ms = time_ms;
-            }
-        }
-        else if (intrusion_id == INTRUSION_OFF)
-        {
-            self->light_and_display_start_time_ms = 0U;
-        }
-    }
-    else if (rcv_msg->cmd_id == SET_LIGHT) 
-    {
-        const node_light_id_t light_id = (node_light_id_t)(rcv_msg->value_0);
-
-        if (light_id == LIGHT_ON)
-        {
-            const uint32_t duration_ms = time_ms - self->light_and_display_start_time_ms;
-
-            if (duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
-            {
-                self->light_and_display_start_time_ms = time_ms;
-            }
-        }
-        else if (light_id == LIGHT_OFF)
-        {
-            self->light_and_display_start_time_ms = 0U;
-        }
-    }
 
     return;
 }

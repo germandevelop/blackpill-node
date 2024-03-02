@@ -81,16 +81,16 @@ void node_T01_process_remote_button (node_T01_t * const self,
 void node_T01_process_front_movement (  node_T01_t * const self,
                                         uint32_t time_ms);
 
+void node_T01_process_rcv_msg ( node_T01_t * const self,
+                                node_msg_t const * const rcv_msg,
+                                uint32_t time_ms);
+
 void node_T01_get_light_data (  node_T01_t const * const self,
                                 uint32_t * const disable_time_ms);
 
 void node_T01_get_display_data (node_T01_t const * const self,
                                 node_T01_humidity_t * const data,
                                 uint32_t * const disable_time_ms);
-
-void node_T01_process_rcv_msg ( node_T01_t * const self,
-                                node_msg_t const * const rcv_msg,
-                                uint32_t time_ms);
 
 int node_T01_get_msg (  node_T01_t * const self,
                         node_msg_t *msg,
@@ -115,7 +115,7 @@ typedef struct node_T01
 
     node_T01_humidity_t humidity;
 
-    node_msg_t send_msg_buffer[8];
+    node_msg_t send_msg_buffer[4];
     size_t send_msg_buffer_size;
 
 } node_T01_t;

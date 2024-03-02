@@ -5,7 +5,6 @@
 
 #include "board_T01.h"
 
-#include <stdbool.h>
 #include <limits.h>
 #include <assert.h>
 
@@ -34,14 +33,15 @@
 #define RTOS_TASK_NAME          "board_T01" // 16 - max length
 
 #define RTOS_TIMER_TICKS_TO_WAIT    (1U * 1000U)
-#define PIR_HYSTERESIS_MS           (1U * 1000U) // 1 sec
 
 #define DEFAULT_ERROR_TEXT  "Board T01 error"
 #define MALLOC_ERROR_TEXT   "Board T01 memory allocation error"
 
-#define REMOTE_BUTTON_NOTIFICATION      (1 << 0)
 #define FRONT_PIR_NOTIFICATION          (1 << 1)
 #define UPDATE_STATE_NOTIFICATION       (1 << 2)
+
+#define I2C_TIMEOUT_MS      (1U * 1000U) // 1 sec
+#define PIR_HYSTERESIS_MS   (1U * 1000U) // 1 sec
 
 #define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
@@ -49,8 +49,6 @@
 
 static TaskHandle_t task;
 static SemaphoreHandle_t node_mutex;
-static SemaphoreHandle_t remote_button_mutex;
-static TimerHandle_t luminosity_timer;
 static TimerHandle_t humidity_timer;
 static TimerHandle_t reed_switch_timer;
 static TimerHandle_t light_timer;
@@ -59,16 +57,9 @@ static TimerHandle_t display_timer;
 static board_T01_config_t config;
 
 static node_T01_t *node;
-static board_remote_button_t latest_remote_button;
-static board_led_color_t status_led_color;
-static bool is_light_on;
-static bool is_display_on;
-static bool is_warning_led_on;
-
 
 static int board_T01_malloc (std_error_t * const error);
 static void board_T01_task (void *parameters);
-static void board_T01_luminosity_timer (TimerHandle_t timer);
 static void board_T01_humidity_timer (TimerHandle_t timer);
 static void board_T01_reed_switch_timer (TimerHandle_t timer);
 static void board_T01_light_timer (TimerHandle_t timer);
@@ -89,12 +80,11 @@ static void board_T01_disable_warning_led_power ();
 
 int board_T01_init (board_T01_config_t const * const init_config, std_error_t * const error)
 {
-    assert(init_config                          != NULL);
-    assert(init_config->mcp23017_expander       != NULL);
-    assert(init_config->w25q32bv_flash          != NULL);
-    assert(init_config->set_led_color_callback  != NULL);
-    assert(init_config->get_luminosity_callback != NULL);
-    assert(init_config->send_node_msg_callback  != NULL);
+    assert(init_config                              != NULL);
+    assert(init_config->mcp23017_expander           != NULL);
+    assert(init_config->w25q32bv_flash              != NULL);
+    assert(init_config->update_status_led_callback  != NULL);
+    assert(init_config->send_node_msg_callback      != NULL);
 
     config = *init_config;
 
@@ -108,10 +98,7 @@ void board_T01_task (void *parameters)
     std_error_t error;
     std_error_init(&error);
 
-    status_led_color    = NO_COLOR;
-    is_light_on         = false;
-    is_display_on       = false;
-    is_warning_led_on   = false;
+    bool is_warning_led_on = false;
 
     // Init node
     node_T01_init(node);
@@ -123,7 +110,7 @@ void board_T01_task (void *parameters)
         bme280_sensor_config_t config;
         config.write_i2c_callback   = board_i2c_1_write_register;
         config.read_i2c_callback    = board_i2c_1_read_register;
-        config.i2c_timeout_ms       = 1U * 1000U;
+        config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
         config.delay_callback       = vTaskDelay;
 
         if (bme280_sensor_init(&config, &error) != STD_SUCCESS)
@@ -138,19 +125,6 @@ void board_T01_task (void *parameters)
         xTaskNotifyWait(0U, ULONG_MAX, &notification, 30U * 1000U);
 
         const uint32_t tick_count_ms = xTaskGetTickCount();
-
-        if ((notification & REMOTE_BUTTON_NOTIFICATION) != 0U)
-        {
-            board_remote_button_t remote_button;
-
-            xSemaphoreTake(remote_button_mutex, portMAX_DELAY);
-            remote_button = latest_remote_button;
-            xSemaphoreGive(remote_button_mutex);
-
-            xSemaphoreTake(node_mutex, portMAX_DELAY);
-            node_T01_process_remote_button(node, remote_button);
-            xSemaphoreGive(node_mutex);
-        }
 
         if ((notification & FRONT_PIR_NOTIFICATION) != 0U)
         {
@@ -234,11 +208,7 @@ void board_T01_task (void *parameters)
             }
 
             // Update status LED color
-            if (node_state.status_led_color != status_led_color)
-            {
-                status_led_color = node_state.status_led_color;
-                config.set_led_color_callback(status_led_color, NULL);
-            }
+            config.update_status_led_callback(node_state.status_led_color);
         }
 
         LOG("Board T01 : loop\r\n");
@@ -247,12 +217,10 @@ void board_T01_task (void *parameters)
     return;
 }
 
-void board_T01_receive_node_msg (node_msg_t const * const rcv_msg)
+void board_T01_process_remote_button (board_remote_button_t remote_button)
 {
-    const uint32_t tick_count_ms = xTaskGetTickCount();
-
     xSemaphoreTake(node_mutex, portMAX_DELAY);
-    node_T01_process_rcv_msg(node, rcv_msg, tick_count_ms);
+    node_T01_process_remote_button(node, remote_button);
     xSemaphoreGive(node_mutex);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
@@ -260,50 +228,51 @@ void board_T01_receive_node_msg (node_msg_t const * const rcv_msg)
     return;
 }
 
-void board_T01_luminosity_timer (TimerHandle_t timer)
+void board_T01_process_luminosity (uint32_t luminosity_adc, uint32_t * const next_time_ms)
 {
-    UNUSED(timer);
+    node_T01_luminosity_t luminosity;
+    luminosity.adc      = luminosity_adc;
+    luminosity.is_valid = true;
 
-    if ((is_light_on != true) && (is_display_on != true))
+    xSemaphoreTake(node_mutex, portMAX_DELAY);
+    node_T01_process_luminosity(node, &luminosity, next_time_ms);
+    xSemaphoreGive(node_mutex);
+
+    xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
+
+    return;
+}
+
+void board_T01_get_lightning_status (bool * const is_lightning_on)
+{
+    const uint32_t tick_count_ms = xTaskGetTickCount();
+
+    node_T01_state_t node_state;
+
+    xSemaphoreTake(node_mutex, portMAX_DELAY);
+    node_T01_get_state(node, &node_state, tick_count_ms);
+    xSemaphoreGive(node_mutex);
+
+    *is_lightning_on = (node_state.is_light_on == true) || (node_state.is_display_on == true);
+
+    if (*is_lightning_on != true)
     {
-        std_error_t error;
-        std_error_init(&error);
-
-        board_T01_disable_warning_led_power();
-        config.set_led_color_callback(NO_COLOR, NULL);
-
-        vTaskDelay(100U);
-
-        node_T01_luminosity_t luminosity;
-
-        if (config.get_luminosity_callback(&luminosity.adc, &error) != STD_FAILURE)
+        if (node_state.is_warning_led_on == true)
         {
-            luminosity.is_valid = true;
-
-            LOG("Board T01 : luminosity adc = %lu\r\n", luminosity.adc);
+            board_T01_disable_warning_led_power();
         }
-        else
-        {
-            luminosity.is_valid = false;
-
-            LOG("Board T01 : %s\r\n", error.text);
-        }
-
-        uint32_t next_time_ms;
-
-        xSemaphoreTake(node_mutex, portMAX_DELAY);
-        node_T01_process_luminosity(node, &luminosity, &next_time_ms);
-        xSemaphoreGive(node_mutex);
-
-        is_light_on     = false;
-        is_display_on   = false;
-
-        xTimerChangePeriod(luminosity_timer, next_time_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
     }
-    else
-    {
-        xTimerStart(luminosity_timer, RTOS_TIMER_TICKS_TO_WAIT);
-    }
+
+    return;
+}
+
+void board_T01_process_rcv_node_msg (node_msg_t const * const rcv_msg)
+{
+    const uint32_t tick_count_ms = xTaskGetTickCount();
+
+    xSemaphoreTake(node_mutex, portMAX_DELAY);
+    node_T01_process_rcv_msg(node, rcv_msg, tick_count_ms);
+    xSemaphoreGive(node_mutex);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
 
@@ -384,6 +353,8 @@ void board_T01_light_timer (TimerHandle_t timer)
 {
     UNUSED(timer);
 
+    static bool is_light_on = false;
+
     if (is_light_on != true)
     {
         is_light_on = true;
@@ -434,21 +405,6 @@ void board_T01_disable_warning_led_power ()
     return;
 }
 
-void board_T01_remote_control_ISR (board_remote_button_t remote_button)
-{
-    BaseType_t is_higher_priority_task_woken;
-
-    xSemaphoreTakeFromISR(remote_button_mutex, &is_higher_priority_task_woken);
-    latest_remote_button = remote_button;
-    xSemaphoreGiveFromISR(remote_button_mutex, &is_higher_priority_task_woken);
-
-    xTaskNotifyFromISR(task, REMOTE_BUTTON_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
-
-    portYIELD_FROM_ISR(is_higher_priority_task_woken);
-
-    return;
-}
-
 void board_T01_front_pir_ISR ()
 {
     static TickType_t last_tick_count_ms = 0U;
@@ -470,6 +426,8 @@ void board_T01_front_pir_ISR ()
 void board_T01_display_timer (TimerHandle_t timer)
 {
     UNUSED(timer);
+
+    static bool is_display_on = false;
 
     if (is_display_on != true)
     {
@@ -693,26 +651,21 @@ int board_T01_malloc (std_error_t * const error)
 
     const bool are_buffers_allocated = (node != NULL);
 
-    node_mutex          = xSemaphoreCreateMutex();
-    remote_button_mutex = xSemaphoreCreateMutex();
+    node_mutex = xSemaphoreCreateMutex();
 
-    const bool are_semaphores_allocated = (node_mutex != NULL) && (remote_button_mutex != NULL);
+    const bool are_semaphores_allocated = (node_mutex != NULL);
 
-    luminosity_timer    = xTimerCreate("luminosity", 0U, pdFALSE, NULL, board_T01_luminosity_timer);
     humidity_timer      = xTimerCreate("humidity", 0U, pdFALSE, NULL, board_T01_humidity_timer);
     reed_switch_timer   = xTimerCreate("reed_switch", 0U, pdFALSE, NULL, board_T01_reed_switch_timer);
     display_timer       = xTimerCreate("display", 0U, pdFALSE, NULL, board_T01_display_timer);
     light_timer         = xTimerCreate("light", 0U, pdFALSE, NULL, board_T01_light_timer);
 
-    const bool are_timers_allocated = (luminosity_timer != NULL) && (humidity_timer != NULL) &&
-                                        (reed_switch_timer != NULL) && (display_timer != NULL);
+    const bool are_timers_allocated = (humidity_timer != NULL) && (reed_switch_timer != NULL) && (display_timer != NULL);
 
     if ((are_buffers_allocated != true) || (are_semaphores_allocated != true) || (are_timers_allocated != true))
     {
         vPortFree((void*)node);
         vSemaphoreDelete(node_mutex);
-        vSemaphoreDelete(remote_button_mutex);
-        xTimerDelete(luminosity_timer, RTOS_TIMER_TICKS_TO_WAIT);
         xTimerDelete(humidity_timer, RTOS_TIMER_TICKS_TO_WAIT);
         xTimerDelete(reed_switch_timer, RTOS_TIMER_TICKS_TO_WAIT);
         xTimerDelete(display_timer, RTOS_TIMER_TICKS_TO_WAIT);
