@@ -60,7 +60,6 @@
 #define LUMINOSITY_MEAUSEREMENT_COUNT       5U
 #define LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS  (2U * 1000U)
 
-#define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 

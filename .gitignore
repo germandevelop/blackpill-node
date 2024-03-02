@@ -1,3 +1,6 @@
 build/
 external/
 .vscode/
+docs/scheme/board/board-backups/
+docs/scheme/board/board.kicad_prl
+docs/scheme/board/fp-info-cache
