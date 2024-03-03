@@ -6,6 +6,8 @@
 #ifndef BOARD_TYPES_H
 #define BOARD_TYPES_H
 
+#include <stdint.h>
+
 typedef enum board_remote_button
 {
     ZERO_BUTTON     = 0,
@@ -37,5 +39,13 @@ typedef enum board_led_color
     RED_COLOR
 
 } board_led_color_t;
+
+typedef struct photoresistor_data
+{
+    uint32_t adc;
+    float voltage_V;
+    uint32_t resistance_Ohm;
+
+} photoresistor_data_t;
 
 #endif // BOARD_TYPES_H

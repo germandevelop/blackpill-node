@@ -57,8 +57,10 @@
 #define LFS_CACHE_SIZE          512U
 #define LFS_LOOKAHEAD_SIZE      128U
 
-#define LUMINOSITY_MEAUSEREMENT_COUNT       5U
-#define LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS  (2U * 1000U)
+#define I2C_TIMEOUT_MS                          (1U * 1000U)    // 1 sec
+#define PHOTORESISTOR_MEAUSEREMENT_COUNT        5U
+#define PHOTORESISTOR_MEAUSEREMENT_TIMEOUT_MS   (2U * 1000U)
+#define PHOTORESISTOR_INITIAL_PERIOD_MS         (30U * 1000U)   // 30 sec
 
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
@@ -66,7 +68,7 @@
 static TaskHandle_t task;
 static SemaphoreHandle_t status_led_mutex;
 static SemaphoreHandle_t remote_button_mutex;
-static TimerHandle_t luminosity_timer;
+static TimerHandle_t photoresistor_timer;
 
 static board_config_t config;
 
@@ -84,7 +86,7 @@ static uint8_t lfs_lookahead_buffer[LFS_LOOKAHEAD_SIZE];
 
 static int board_malloc (std_error_t * const error);
 static void board_task (void *parameters);
-static void board_luminosity_timer (TimerHandle_t timer);
+static void board_photoresistor_timer (TimerHandle_t timer);
 
 static void board_init_logger ();
 static void board_init_filesystem ();
@@ -109,7 +111,7 @@ static void board_timer_2_ic_isr_callback (uint32_t captured_value);
 
 static void board_update_status_led (board_led_color_t led_color);
 static int board_set_status_led_color (board_led_color_t led_color, std_error_t * const error);
-static int board_read_luminosity (uint32_t * const luminosity_adc, std_error_t * const error);
+static int board_read_photoresistor (uint32_t * const photoresistor_adc, std_error_t * const error);
 
 static int board_lfs_block_device_read (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, void *raw_data, lfs_size_t size);
 static int board_lfs_block_device_prog (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, const void *raw_data, lfs_size_t size);
@@ -126,8 +128,8 @@ int board_init (board_config_t const * const init_config, std_error_t * const er
 #endif // NDEBUG
 
     assert(init_config != NULL);
-    assert(init_config->refresh_watchdog_callback != NULL);
-    assert(init_config->watchdog_timeout_ms != 0U);
+    assert(init_config->refresh_watchdog_callback   != NULL);
+    assert(init_config->watchdog_timeout_ms         != 0U);
 
     config = *init_config;
 
@@ -156,22 +158,24 @@ void board_task (void *parameters)
 
         if (node_init(&config, &error) != STD_SUCCESS)
         {
-            LOG("%s\r\n", error.text);
+            LOG("Board : %s\r\n", error.text);
         }
     }
 
     {
         board_T01_config_t config;
-        config.mcp23017_expander        = &mcp23017_expander;
-        config.w25q32bv_flash           = &w25q32bv_flash;
-        config.update_status_led_callback = board_update_status_led;
-        config.send_node_msg_callback   = node_send_msg;
+        config.mcp23017_expander            = &mcp23017_expander;
+        config.w25q32bv_flash               = &w25q32bv_flash;
+        config.update_status_led_callback   = board_update_status_led;
+        config.send_node_msg_callback       = node_send_msg;
 
         if (board_T01_init(&config, &error) != STD_SUCCESS)
         {
-            LOG("%s\r\n", error.text);
+            LOG("Board : %s\r\n", error.text);
         }
     }
+
+    xTimerStart(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
 
     while (true)
     {
@@ -239,7 +243,7 @@ void board_init_filesystem ()
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
 
         return;
     }
@@ -268,15 +272,15 @@ void board_init_filesystem ()
 
     if (exit_code != STD_FAILURE)
     {
-        LOG("Flash JEDEC ID : 0x%lX\r\n", flash_info.jedec_id);
-        LOG("Flash capacity: %lu KBytes\r\n", flash_info.capacity_KByte);
+        LOG("Board : Flash JEDEC ID : 0x%lX\r\n", flash_info.jedec_id);
+        LOG("Board : Flash capacity: %lu KBytes\r\n", flash_info.capacity_KByte);
     }
     else
     {
         LOG("%s\r\n", error.text);
     }
 
-    LOG("Init LittleFS\r\n");
+    LOG("Board : Init LittleFS\r\n");
 
     struct lfs_config lfs_config = { 0 };
     board_lfs_init_config(&lfs_config);
@@ -286,7 +290,7 @@ void board_init_filesystem ()
 
     if (lfs_error != 0)
     {
-        LOG("Format LittleFS\r\n");
+        LOG("Board : Format LittleFS\r\n");
 
         lfs_format(&lfs, &lfs_config);
         lfs_error = lfs_mount(&lfs, &lfs_config);
@@ -294,7 +298,7 @@ void board_init_filesystem ()
 
     if (lfs_error == 0)
     {
-        LOG("Mount LittleFS STD_SUCCESS\r\n");
+        LOG("Board : Mount LittleFS success\r\n");
     }
     lfs_unmount(&lfs);
 
@@ -302,7 +306,7 @@ void board_init_filesystem ()
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("%s\r\n", error.text);
+        LOG("Board : %s\r\n", error.text);
     }
 
     return;
@@ -326,40 +330,42 @@ void board_init_tcp_client ()
 
     LOG("Board : Init TCP-Client\r\n");
 
-    tcp_client_config_t tcp_client_config = { 0 };
+    tcp_client_config_t config = { 0 };
 
-    tcp_client_config.spi_lock_callback     = board_spi_1_lock;
-    tcp_client_config.spi_unlock_callback   = board_spi_1_unlock;
-    tcp_client_config.spi_select_callback   = board_w5500_spi_1_select;
-    tcp_client_config.spi_unselect_callback = board_w5500_spi_1_unselect;
-    tcp_client_config.spi_read_callback     = board_spi_1_read;
-    tcp_client_config.spi_write_callback    = board_spi_1_write;
+    config.process_msg_callback = node_receive_tcp_msg;
 
-    tcp_client_config.mac_address[0] = 0xEA;
-    tcp_client_config.mac_address[1] = 0x11;
-    tcp_client_config.mac_address[2] = 0x22;
-    tcp_client_config.mac_address[3] = 0x33;
-    tcp_client_config.mac_address[4] = 0x44;
-    tcp_client_config.mac_address[5] = 0xEA;
+    config.spi_lock_callback        = board_spi_1_lock;
+    config.spi_unlock_callback      = board_spi_1_unlock;
+    config.spi_select_callback      = board_w5500_spi_1_select;
+    config.spi_unselect_callback    = board_w5500_spi_1_unselect;
+    config.spi_read_callback        = board_spi_1_read;
+    config.spi_write_callback       = board_spi_1_write;
 
-    tcp_client_config.ip_address[0] = 192;
-    tcp_client_config.ip_address[1] = 168;
-    tcp_client_config.ip_address[2] = 0;
-    tcp_client_config.ip_address[3] = 123;
+    config.mac_address[0] = 0xEA;
+    config.mac_address[1] = 0x11;
+    config.mac_address[2] = 0x22;
+    config.mac_address[3] = 0x33;
+    config.mac_address[4] = 0x44;
+    config.mac_address[5] = 0xEA;
 
-    tcp_client_config.netmask[0] = 255;
-    tcp_client_config.netmask[1] = 255;
-    tcp_client_config.netmask[2] = 0;
-    tcp_client_config.netmask[3] = 0;
+    config.ip_address[0] = 192;
+    config.ip_address[1] = 168;
+    config.ip_address[2] = 0;
+    config.ip_address[3] = 123;
 
-    tcp_client_config.server_ip[0] = 192;
-    tcp_client_config.server_ip[1] = 168;
-    tcp_client_config.server_ip[2] = 0;
-    tcp_client_config.server_ip[3] = 101;
+    config.netmask[0] = 255;
+    config.netmask[1] = 255;
+    config.netmask[2] = 0;
+    config.netmask[3] = 0;
 
-    tcp_client_config.server_port = 2399;
+    config.server_ip[0] = 192;
+    config.server_ip[1] = 168;
+    config.server_ip[2] = 0;
+    config.server_ip[3] = 101;
 
-    if (tcp_client_init(&tcp_client_config, &error) != STD_SUCCESS)
+    config.server_port = 2399;
+
+    if (tcp_client_init(&config, &error) != STD_SUCCESS)
     {
         LOG("Board : %s\r\n", error.text);
     }
@@ -387,7 +393,7 @@ void board_init_expander ()
     mcp23017_expander_config_t config;
     config.write_i2c_callback   = board_i2c_1_write_register;
     config.read_i2c_callback    = board_i2c_1_read_register;
-    config.i2c_timeout_ms       = 1U * 1000U;
+    config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
 
     if (mcp23017_expander_init(&mcp23017_expander, &config, &error) != STD_SUCCESS)
     {
@@ -612,6 +618,8 @@ void board_update_status_led (board_led_color_t led_color)
 
     if (led_color != current_led_color)
     {
+        LOG("Board : update status led\r\n");
+
         xSemaphoreTake(status_led_mutex, portMAX_DELAY);
         status_led_color = led_color;
         xSemaphoreGive(status_led_mutex);
@@ -652,7 +660,7 @@ int board_set_status_led_color (board_led_color_t led_color, std_error_t * const
     return exit_code;
 }
 
-void board_luminosity_timer (TimerHandle_t timer)
+void board_photoresistor_timer (TimerHandle_t timer)
 {
     UNUSED(timer);
 
@@ -670,16 +678,31 @@ void board_luminosity_timer (TimerHandle_t timer)
         {
             vTaskDelay(1U * 1000U);
 
-            uint32_t luminosity_adc = 0U;
+            uint32_t divider_adc = 0U;
 
-            if (board_read_luminosity(&luminosity_adc, &error) != STD_FAILURE)
+            if (board_read_photoresistor(&divider_adc, &error) != STD_FAILURE)
             {
-                LOG("Board : luminosity adc = %lu\r\n", luminosity_adc);
+                const uint32_t adc_max_value        = 4095U;
+                const float supply_voltage_V        = 3.3F;
+                const float divider_resistance_Ohm  = 10000.0F;
+
+                photoresistor_data_t data;
+                data.adc        = adc_max_value - divider_adc;
+                data.voltage_V  = supply_voltage_V * ((float)(data.adc) / (float)(adc_max_value));
+
+                const float divider_voltage_V = supply_voltage_V - data.voltage_V;
+                const float current_A = divider_voltage_V / divider_resistance_Ohm;
+
+                data.resistance_Ohm = (uint32_t)(supply_voltage_V / current_A);
+
+                LOG("Board : photoresistor adc = %lu\r\n", data.adc);
+                LOG("Board : photoresistor voltage = %.2f V\r\n", data.voltage_V);
+                LOG("Board : photoresistor resistance = %lu Ohm\r\n", data.resistance_Ohm);
 
                 uint32_t timer_period_ms;
-                board_T01_process_luminosity(luminosity_adc, &timer_period_ms);
+                board_T01_process_photoresistor_data(&data, &timer_period_ms);
 
-                xTimerChangePeriod(luminosity_timer, timer_period_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+                xTimerChangePeriod(photoresistor_timer, timer_period_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
@@ -694,7 +717,7 @@ void board_luminosity_timer (TimerHandle_t timer)
 
     if (is_timer_started != true)
     {
-        xTimerStart(luminosity_timer, RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerStart(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
     }
 
     xTaskNotify(task, STATUS_LED_NOTIFICATION, eSetBits);
@@ -702,30 +725,30 @@ void board_luminosity_timer (TimerHandle_t timer)
     return;
 }
 
-int board_read_luminosity (uint32_t * const luminosity_adc, std_error_t * const error)
+int board_read_photoresistor (uint32_t * const photoresistor_adc, std_error_t * const error)
 {
     int exit_code = board_adc_1_init(error);
 
     if (exit_code == STD_SUCCESS)
     {
-        uint32_t luminosity_buffer      = 0U;
-        uint32_t luminosity_buffer_size = 0U;
+        uint32_t photoresistor_buffer       = 0U;
+        uint32_t photoresistor_buffer_size  = 0U;
 
-        for (size_t i = 0U; i < LUMINOSITY_MEAUSEREMENT_COUNT; ++i)
+        for (size_t i = 0U; i < PHOTORESISTOR_MEAUSEREMENT_COUNT; ++i)
         {
             uint32_t adc_value;
-            exit_code = board_adc_1_read_value(&adc_value, LUMINOSITY_MEAUSEREMENT_TIMEOUT_MS, error);
+            exit_code = board_adc_1_read_value(&adc_value, PHOTORESISTOR_MEAUSEREMENT_TIMEOUT_MS, error);
 
             if (exit_code == STD_SUCCESS)
             {
-                luminosity_buffer += adc_value;
-                ++luminosity_buffer_size;
+                photoresistor_buffer += adc_value;
+                ++photoresistor_buffer_size;
             }
         }
 
-        if (luminosity_buffer_size != 0U)
+        if (photoresistor_buffer_size != 0U)
         {
-            *luminosity_adc = luminosity_buffer / luminosity_buffer_size;
+            *photoresistor_adc = photoresistor_buffer / photoresistor_buffer_size;
         }
         else
         {
@@ -744,15 +767,15 @@ int board_malloc (std_error_t * const error)
 
     const bool are_semaphores_allocated = (status_led_mutex != NULL) && (remote_button_mutex != NULL);
 
-    luminosity_timer = xTimerCreate("luminosity", 0U, pdFALSE, NULL, board_luminosity_timer);
+    photoresistor_timer = xTimerCreate("photoresistor", (PHOTORESISTOR_INITIAL_PERIOD_MS / portTICK_PERIOD_MS), pdFALSE, NULL, board_photoresistor_timer);
 
-    const bool are_timers_allocated = (luminosity_timer != NULL);
+    const bool are_timers_allocated = (photoresistor_timer != NULL);
 
     if ((are_semaphores_allocated != true) || (are_timers_allocated != true))
     {
         vSemaphoreDelete(status_led_mutex);
         vSemaphoreDelete(remote_button_mutex);
-        xTimerDelete(luminosity_timer, RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerDelete(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
 

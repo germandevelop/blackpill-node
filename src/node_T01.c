@@ -188,7 +188,7 @@ void node_T01_process_luminosity (  node_T01_t * const self,
 
     if (data->is_valid == true)
     {
-        if (data->adc > NODE_T01_DARKNESS_LEVEL_ADC)
+        if (data->lux < NODE_T01_DARKNESS_LEVEL_LUX)
         {
             self->is_dark = true;
         }

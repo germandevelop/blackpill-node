@@ -11,7 +11,7 @@
 #define NODE_T01_HUMIDITY_PERIOD_MS             (2U * 60U * 1000U)  // 2 min
 #define NODE_T01_DOOR_STATE_PERIOD_MS           (2U * 60U * 1000U)  // 2 min
 
-#define NODE_T01_DARKNESS_LEVEL_ADC 500U
+#define NODE_T01_DARKNESS_LEVEL_LUX 5.5F
 #define NODE_T01_HIGH_TEMPERATURE_C 25.0F
 #define NODE_T01_LOW_TEMPERATURE_C  15.0F
 
@@ -38,7 +38,7 @@ typedef struct node_T01_state
 
 typedef struct node_T01_luminosity
 {
-    uint32_t adc;
+    float lux;
     bool is_valid;
 
 } node_T01_luminosity_t;

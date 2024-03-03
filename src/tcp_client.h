@@ -14,7 +14,7 @@ typedef struct std_error std_error_t;
 typedef void (*tcp_client_spi_lock_callback_t) ();
 typedef void (*tcp_client_spi_select_callback_t) ();
 typedef int (*tcp_client_spi_tx_rx_callback_t) (uint8_t *data, uint16_t size, uint32_t timeout_ms, std_error_t * const error);
-typedef void (*tcp_client_process_msg_callback_t) (tcp_msg_t const * const msg);
+typedef int (*tcp_client_process_msg_callback_t) (tcp_msg_t const * const recv_msg, std_error_t * const error);
 
 typedef struct tcp_client_config
 {

@@ -126,7 +126,7 @@ void tcp_client_task (void *parameters)
     {
         if (tcp_client_setup_w5500(&error) != STD_SUCCESS)
         {
-            LOG("%s\r\n", error.text);
+            LOG("TCP-Client: %s\r\n", error.text);
 
             vTaskDelay(5U * 1000U);
         }
@@ -187,7 +187,10 @@ void tcp_client_task (void *parameters)
 
                     recv_msg.size = (size_t)msg_size;
 
-                    config.process_msg_callback(&recv_msg);
+                    if (config.process_msg_callback(&recv_msg, &error) != STD_SUCCESS)
+                    {
+                        LOG("TCP-Client: %s\r\n", error.text);
+                    }
                 }
                 else
                 {

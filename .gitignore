@@ -1,6 +1,6 @@
 build/
 external/
 .vscode/
-docs/scheme/board/board-backups/
-docs/scheme/board/board.kicad_prl
-docs/scheme/board/fp-info-cache
+docs/scheme/blackpill_board/blackpill_board-backups/
+docs/scheme/blackpill_board/blackpill_board.kicad_prl
+docs/scheme/blackpill_board/fp-info-cache

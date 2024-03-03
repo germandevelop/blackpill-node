@@ -32,7 +32,7 @@ typedef struct board_T01_config
 int board_T01_init (board_T01_config_t const * const init_config, std_error_t * const error);
 
 void board_T01_process_remote_button (board_remote_button_t remote_button);
-void board_T01_process_luminosity (uint32_t luminosity_adc, uint32_t * const next_time_ms);
+void board_T01_process_photoresistor_data (photoresistor_data_t const * const data, uint32_t * const next_time_ms);
 void board_T01_get_lightning_status (bool * const is_lightning_on);
 void board_T01_process_rcv_node_msg (node_msg_t const * const rcv_msg);
 
