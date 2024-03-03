@@ -70,10 +70,10 @@ TEST_P(NodeT01ParameterizedLuminosity, ProcessLuminosity)
 INSTANTIATE_TEST_SUITE_P(NodeT01TestFixture, NodeT01ParameterizedLuminosity,
     ::testing::Values
     (
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC),       .is_valid = false },    false),
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U),  .is_valid = false },    false),
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC),       .is_valid = true },     false),
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U),  .is_valid = true },     true)
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX),       .is_valid = false },    false),
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F),.is_valid = false },    false),
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX),       .is_valid = true },     false),
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F),.is_valid = true },     true)
     )
 );
 
@@ -239,32 +239,32 @@ TEST_P(NodeT01ParameterizedMsgMode, ProcessMsgMode)
 INSTANTIATE_TEST_SUITE_P(NodeT01TestFixture, NodeT01ParameterizedMsgMode,
     ::testing::Values
     (
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false })
@@ -313,220 +313,220 @@ INSTANTIATE_TEST_SUITE_P(NodeT01TestFixture, NodeT01ParameterizedMsgCommand,
     ::testing::Values
     (
         // Alarm mode
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
         // Guard mode
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
         // Silence mode
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
         // Silence mode double
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
@@ -573,77 +573,102 @@ INSTANTIATE_TEST_SUITE_P(NodeT01TestFixture, NodeT01ParameterizedFrontPir,
     ::testing::Values
     (
         // Alarm mode
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(ALARM) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = true, .is_msg_to_send = false }),
 
         // Guard mode
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = false,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = true }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(GUARD) },
                         node_T01_state_t { .status_led_color = RED_COLOR, .is_light_on = true,
                             .is_display_on = false, .is_warning_led_on = false, .is_msg_to_send = true }),
 
         // Silence mode
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_MODE, .value_0 = (uint32_t)(SILENCE) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = true }),
 
         // Silence mode double
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_LIGHT, .value_0 = (uint32_t)(LIGHT_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = true }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_ON) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = false,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = false }),
 
-        std::make_tuple(node_T01_luminosity_t { .adc = (NODE_T01_DARKNESS_LEVEL_ADC + 1U), .is_valid = true },
+        std::make_tuple(node_T01_luminosity_t { .lux = (NODE_T01_DARKNESS_LEVEL_LUX - 1.0F), .is_valid = true },
                         node_msg_t { .cmd_id = SET_INTRUSION, .value_0 = (uint32_t)(INTRUSION_OFF) },
                         node_T01_state_t { .status_led_color = GREEN_COLOR, .is_light_on = true,
                             .is_display_on = true, .is_warning_led_on = false, .is_msg_to_send = true })
     )
 );
+
+TEST_F(NodeT01TestFixture, NodeT01FrontPir)
+{
+    // Arrange: create and set up a system under test
+    node_T01_state_t expected_state;
+    expected_state.status_led_color     = GREEN_COLOR;
+    expected_state.is_light_on          = false;
+    expected_state.is_display_on        = false;
+    expected_state.is_warning_led_on    = false;
+    expected_state.is_msg_to_send       = false;
+
+    // Act: poke the system under test
+    node_T01_process_front_movement(&node, (NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS * 2U));
+    node_T01_process_front_movement(&node, (NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS * 3U));
+
+    node_T01_state_t result_state;
+    node_T01_get_state(&node, &result_state, ((NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS * 3U) + 1U));
+
+    // Assert: make unit test pass or fail
+    EXPECT_EQ(result_state.status_led_color,    expected_state.status_led_color);
+    EXPECT_EQ(result_state.is_light_on,         expected_state.is_light_on);
+    EXPECT_EQ(result_state.is_display_on,       expected_state.is_display_on);
+    EXPECT_EQ(result_state.is_warning_led_on,   expected_state.is_warning_led_on);
+    EXPECT_EQ(result_state.is_msg_to_send,      expected_state.is_msg_to_send);
+}
