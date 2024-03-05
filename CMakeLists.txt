@@ -283,7 +283,7 @@ target_sources(blackpill_firmware
         src/node.mapper.c
         src/tcp_client.h
         src/tcp_client.c
-        src/tcp_client.types.h
+        src/tcp_client.type.h
 
         src/board_T01.h
         src/board_T01.c
