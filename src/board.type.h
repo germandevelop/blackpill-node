@@ -3,8 +3,8 @@
  *   Date   : 2024
  ************************************************************/
 
-#ifndef BOARD_TYPES_H
-#define BOARD_TYPES_H
+#ifndef BOARD_TYPE_H
+#define BOARD_TYPE_H
 
 #include <stdint.h>
 
@@ -42,10 +42,9 @@ typedef enum board_led_color
 
 typedef struct photoresistor_data
 {
-    uint32_t adc;
     float voltage_V;
     uint32_t resistance_Ohm;
 
 } photoresistor_data_t;
 
-#endif // BOARD_TYPES_H
+#endif // BOARD_TYPE_H

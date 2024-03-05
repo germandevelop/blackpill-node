@@ -20,7 +20,7 @@
 
 #include "node/node.types.h"
 #include "node/node.command.h"
-#include "board.types.h"
+#include "board.type.h"
 
 typedef struct node_T01 node_T01_t;
 typedef struct std_error std_error_t;

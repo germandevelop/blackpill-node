@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "board.types.h"
+#include "board.type.h"
 
 typedef struct mcp23017_expander mcp23017_expander_t;
 typedef struct w25q32bv_flash w25q32bv_flash_t;

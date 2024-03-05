@@ -260,7 +260,7 @@ target_sources(blackpill_firmware
     INTERFACE
         src/board.h
         src/board.c
-        src/board.types.h
+        src/board.type.h
         src/board.uart_2.h
         src/board.uart_2.c
         src/board.spi_1.h

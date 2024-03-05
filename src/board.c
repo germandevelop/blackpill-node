@@ -17,7 +17,7 @@
 
 #include "lfs.h"
 
-#include "board.types.h"
+#include "board.type.h"
 #include "board.uart_2.h"
 #include "board.spi_1.h"
 #include "board.i2c_1.h"
@@ -686,16 +686,16 @@ void board_photoresistor_timer (TimerHandle_t timer)
                 const float supply_voltage_V        = 3.3F;
                 const float divider_resistance_Ohm  = 10000.0F;
 
+                const uint32_t adc_value = adc_max_value - divider_adc;
+
                 photoresistor_data_t data;
-                data.adc        = adc_max_value - divider_adc;
-                data.voltage_V  = supply_voltage_V * ((float)(data.adc) / (float)(adc_max_value));
+                data.voltage_V  = supply_voltage_V * ((float)(adc_value) / (float)(adc_max_value));
 
                 const float divider_voltage_V = supply_voltage_V - data.voltage_V;
                 const float current_A = divider_voltage_V / divider_resistance_Ohm;
 
-                data.resistance_Ohm = (uint32_t)(supply_voltage_V / current_A);
+                data.resistance_Ohm = (uint32_t)(data.voltage_V / current_A);
 
-                LOG("Board : photoresistor adc = %lu\r\n", data.adc);
                 LOG("Board : photoresistor voltage = %.2f V\r\n", data.voltage_V);
                 LOG("Board : photoresistor resistance = %lu Ohm\r\n", data.resistance_Ohm);
 

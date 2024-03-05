@@ -4,7 +4,7 @@
  ************************************************************/
 
 #include "tcp_client.h"
-#include "tcp_client.types.h"
+#include "tcp_client.type.h"
 
 #include <stdbool.h>
 #include <string.h>

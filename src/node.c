@@ -15,7 +15,7 @@
 #include "task.h"
 #include "queue.h"
 
-#include "tcp_client.types.h"
+#include "tcp_client.type.h"
 
 #include "logger.h"
 #include "std_error/std_error.h"
