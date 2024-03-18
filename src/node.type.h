@@ -3,8 +3,8 @@
  *   Date   : 2023
  ************************************************************/
 
-#ifndef NODE_TYPES_H
-#define NODE_TYPES_H
+#ifndef NODE_TYPE_H
+#define NODE_TYPE_H
 
 #include <stddef.h>
 
@@ -31,4 +31,4 @@ typedef struct node_msg
 
 } node_msg_t;
 
-#endif // NODE_TYPES_H
+#endif // NODE_TYPE_H

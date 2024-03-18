@@ -41,6 +41,12 @@ target_link_libraries(tests
         GTest::gmock_main
         blackpill_under_testing
 )
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL FreeBSD)
+    target_link_options(tests
+        PRIVATE
+            -pthread
+    )
+endif()
 
 # Setup tests scanning
 include(GoogleTest)

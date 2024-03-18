@@ -4,7 +4,7 @@
  ************************************************************/
 
 #include "node.h"
-#include "node/node.types.h"
+#include "node.type.h"
 #include "node.mapper.h"
 
 #include <stdbool.h>

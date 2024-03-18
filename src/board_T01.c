@@ -457,8 +457,9 @@ void board_T01_front_pir_ISR ()
 
     if ((tick_count_ms - last_tick_count_ms) > PIR_HYSTERESIS_MS)
     {
-        BaseType_t is_higher_priority_task_woken;
+        last_tick_count_ms = tick_count_ms;
 
+        BaseType_t is_higher_priority_task_woken;
         xTaskNotifyFromISR(task, FRONT_PIR_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
 
         portYIELD_FROM_ISR(is_higher_priority_task_woken);

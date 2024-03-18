@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "node/node.types.h"
+#include "node.type.h"
 #include "node/node.command.h"
 #include "board.type.h"
 

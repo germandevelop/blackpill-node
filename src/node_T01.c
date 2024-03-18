@@ -31,7 +31,7 @@ void node_T01_init (node_T01_t * const self)
     self->state.is_display_on       = false;
     self->state.is_warning_led_on   = false;
 
-    self->mode          = SILENCE;
+    self->mode          = SILENCE_MODE;
     self->is_dark       = false;
     self->is_door_open  = false;
 
@@ -77,7 +77,7 @@ void node_T01_update_state (node_T01_t * const self,
     node_T01_update_time(self, time_ms);
     const uint32_t light_and_display_duration_ms = time_ms - self->light_and_display_start_time_ms;
 
-    if (self->mode == ALARM)
+    if (self->mode == ALARM_MODE)
     {
         if (self->is_dark == true)
         {
@@ -91,7 +91,7 @@ void node_T01_update_state (node_T01_t * const self,
         self->state.is_warning_led_on   = true;
     }
 
-    else if (self->mode == GUARD)
+    else if (self->mode == GUARD_MODE)
     {
         if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
         {
@@ -112,7 +112,7 @@ void node_T01_update_state (node_T01_t * const self,
         self->state.is_warning_led_on   = false;
     }
 
-    else if (self->mode == SILENCE)
+    else if (self->mode == SILENCE_MODE)
     {
         if (light_and_display_duration_ms > NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS)
         {
@@ -154,7 +154,7 @@ void node_T01_update_state (node_T01_t * const self,
     }
 
     // Update status LED color
-    if ((self->mode == GUARD) || (self->mode == ALARM))
+    if ((self->mode == GUARD_MODE) || (self->mode == ALARM_MODE))
     {
         self->state.status_led_color = RED_COLOR;
     }
@@ -305,7 +305,7 @@ void node_T01_process_front_movement (  node_T01_t * const self,
 
         if (self->send_msg_buffer_size != ARRAY_SIZE(self->send_msg_buffer))
         {
-            if ((self->mode == SILENCE) && (self->is_dark == true))
+            if ((self->mode == SILENCE_MODE) && (self->is_dark == true))
             {
                 const size_t i = self->send_msg_buffer_size;
                 size_t j = 0U;
@@ -320,7 +320,7 @@ void node_T01_process_front_movement (  node_T01_t * const self,
 
                 ++self->send_msg_buffer_size;
             }
-            else if (self->mode == GUARD)
+            else if (self->mode == GUARD_MODE)
             {
                 const size_t i = self->send_msg_buffer_size;
                 size_t j = 0U;
