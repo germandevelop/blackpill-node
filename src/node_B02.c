@@ -3,7 +3,7 @@
  *   Date   : 2024
  ************************************************************/
 
-#include "node_T01.h"
+#include "node_B02.h"
 
 #include <assert.h>
 #include <string.h>
@@ -11,27 +11,32 @@
 #include "std_error/std_error.h"
 
 
-#define DEFAULT_ERROR_TEXT  "Node T01 error"
-#define MESSAGE_ERROR_TEXT  "Node T01 message error"
+#define DEFAULT_ERROR_TEXT  "Node B02 error"
+#define MESSAGE_ERROR_TEXT  "Node B02 message error"
 
 #define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 
-static void node_T01_update_time (node_T01_t * const self, uint32_t time_ms);
-static void node_T01_update_state (node_T01_t * const self, uint32_t time_ms);
+static void node_B02_update_time (node_B02_t * const self, uint32_t time_ms);
+static void node_B02_update_state (node_B02_t * const self, uint32_t time_ms);
 
-void node_T01_init (node_T01_t * const self)
+void node_B02_init (node_B02_t * const self)
 {
     assert(self != NULL);
 
-    self->id = NODE_T01;
+    self->id = NODE_B02;
 
-    self->state.is_msg_to_send      = false;
-    self->state.status_led_color    = GREEN_COLOR;
-    self->state.is_light_on         = false;
-    self->state.is_display_on       = false;
-    self->state.is_warning_led_on   = false;
+    self->state.is_msg_to_send                  = false;
+    self->state.status_led_color                = GREEN_COLOR;
+    self->state.is_display_on                   = false;
+    self->state.is_front_pir_on                 = false;
+    self->state.light_strip.is_white_on         = false;
+    self->state.light_strip.is_blue_green_on    = false;
+    self->state.light_strip.is_red_on           = false;
+    self->state.is_veranda_light_on             = false;
+    self->state.is_front_light_on               = false;
+    self->state.is_buzzer_on                    = false;
 
     self->mode      = SILENCE_MODE;
     self->is_dark   = false;
@@ -40,29 +45,28 @@ void node_T01_init (node_T01_t * const self)
     self->display_start_time_ms     = 0U;
     self->intrusion_start_time_ms   = 0U;
 
-    self->humidity.is_valid = false;
-    self->is_door_open      = false;
+    self->temperature.is_valid = false;
 
     self->send_msg_buffer_size = 0U;
 
     return;
 }
 
-void node_T01_get_state (node_T01_t * const self,
-                        node_T01_state_t * const state,
+void node_B02_get_state (node_B02_t * const self,
+                        node_B02_state_t * const state,
                         uint32_t time_ms)
 {
     assert(self     != NULL);
     assert(state    != NULL);
 
-    node_T01_update_state(self, time_ms);
+    node_B02_update_state(self, time_ms);
 
     *state = self->state;
 
     return;
 }
 
-void node_T01_update_time (node_T01_t * const self, uint32_t time_ms)
+void node_B02_update_time (node_B02_t * const self, uint32_t time_ms)
 {
     if (self->light_start_time_ms > time_ms)
     {
@@ -82,13 +86,13 @@ void node_T01_update_time (node_T01_t * const self, uint32_t time_ms)
     return;
 }
 
-void node_T01_update_state (node_T01_t * const self,
+void node_B02_update_state (node_B02_t * const self,
                             uint32_t time_ms)
 {
     assert(self != NULL);
 
     // Update light and display state
-    node_T01_update_time(self, time_ms);
+    node_B02_update_time(self, time_ms);
     const uint32_t light_duration_ms        = time_ms - self->light_start_time_ms;
     const uint32_t display_duration_ms      = time_ms - self->display_start_time_ms;
     const uint32_t intrusion_duration_ms    = time_ms - self->intrusion_start_time_ms;
@@ -97,65 +101,91 @@ void node_T01_update_state (node_T01_t * const self,
     {
         if (self->is_dark == true)
         {
-            self->state.is_light_on = true;
+            self->state.light_strip.is_white_on = true;
+            self->state.is_veranda_light_on     = true;
+            self->state.is_front_light_on       = true;
         }
         else
         {
-            self->state.is_light_on = false;
+            self->state.light_strip.is_white_on = false;
+            self->state.is_veranda_light_on     = false;
+            self->state.is_front_light_on       = false;
         }
-        self->state.is_display_on       = false;
-        self->state.is_warning_led_on   = true;
+        self->state.is_display_on                   = false;
+        self->state.is_front_pir_on                 = false;
+        self->state.light_strip.is_blue_green_on    = false;
+        self->state.light_strip.is_red_on           = true;
+        self->state.is_buzzer_on                    = true;
     }
 
     else if (self->mode == GUARD_MODE)
     {
-        if (light_duration_ms > NODE_T01_LIGHT_DURATION_MS)
+        if (light_duration_ms > NODE_B02_LIGHT_DURATION_MS)
         {
-            self->state.is_light_on = false;
+            self->state.light_strip.is_white_on = false;
+            self->state.is_veranda_light_on     = false;
+            self->state.is_front_light_on       = false;
         }
         else
         {
             if (self->is_dark == true)
             {
-                self->state.is_light_on = true;
+                self->state.light_strip.is_white_on = true;
+                self->state.is_veranda_light_on     = true;
+                self->state.is_front_light_on       = true;
             }
             else
             {
-                self->state.is_light_on = false;
+                self->state.light_strip.is_white_on = false;
+                self->state.is_veranda_light_on     = false;
+                self->state.is_front_light_on       = false;
             }
         }
 
-        if (intrusion_duration_ms > NODE_T01_INTRUSION_DURATION_MS)
+        if (intrusion_duration_ms > NODE_B02_INTRUSION_DURATION_MS)
         {
-            self->state.is_warning_led_on = false;
+            self->state.light_strip.is_red_on   = false;
+            self->state.is_buzzer_on            = false;
         }
         else
         {
-            self->state.is_warning_led_on = true;
+            self->state.light_strip.is_red_on   = true;
+            self->state.is_buzzer_on            = true;
         }
 
-        self->state.is_display_on = false;
+        self->state.is_display_on                   = false;
+        self->state.is_front_pir_on                 = true;
+        self->state.light_strip.is_blue_green_on    = false;
     }
 
     else if (self->mode == SILENCE_MODE)
     {
-        if (light_duration_ms > NODE_T01_LIGHT_DURATION_MS)
+        if (light_duration_ms > NODE_B02_LIGHT_DURATION_MS)
         {
-            self->state.is_light_on = false;
+            self->state.light_strip.is_white_on         = false;
+            self->state.light_strip.is_blue_green_on    = false;
+            self->state.is_veranda_light_on             = false;
+            self->state.is_front_light_on               = false;
         }
         else
         {
             if (self->is_dark == true)
             {
-                self->state.is_light_on = true;
+                self->state.light_strip.is_white_on         = true;
+                self->state.light_strip.is_blue_green_on    = true;
+                self->state.is_veranda_light_on             = true;
+                self->state.is_front_light_on               = true;
             }
             else
             {
-                self->state.is_light_on = false;
+                self->state.light_strip.is_white_on         = false;
+                self->state.light_strip.is_blue_green_on    = false;
+                self->state.is_veranda_light_on             = false;
+                self->state.is_front_light_on               = false;
             }
         }
 
-        if (display_duration_ms > NODE_T01_DISPLAY_DURATION_MS)
+        if (display_duration_ms > NODE_B02_DISPLAY_DURATION_MS)
         {
             self->state.is_display_on = false;
         }
@@ -164,25 +194,17 @@ void node_T01_update_state (node_T01_t * const self,
             self->state.is_display_on = true;
         }
 
-        self->state.is_warning_led_on = false;
-
-        if (self->humidity.is_valid == true)
+        if (self->is_dark == true)
         {
-            if (self->is_door_open == true)
-            {
-                if (self->humidity.temperature_C < NODE_T01_LOW_TEMPERATURE_C)  // Without hysteresis for now
-                {
-                    self->state.is_warning_led_on = true;
-                }
-            }
-            else
-            {
-                if (self->humidity.temperature_C > NODE_T01_HIGH_TEMPERATURE_C) // Without hysteresis for now
-                {
-                    self->state.is_warning_led_on = true;
-                }
-            }
+            self->state.is_front_pir_on = true;
         }
+        else
+        {
+            self->state.is_front_pir_on = false;
+        }
+
+        self->state.light_strip.is_red_on   = false;
+        self->state.is_buzzer_on            = false;
     }
 
     // Update status LED color
@@ -208,19 +230,19 @@ void node_T01_update_state (node_T01_t * const self,
     return;
 }
 
-void node_T01_process_luminosity (  node_T01_t * const self,
-                                    node_T01_luminosity_t const * const data,
+void node_B02_process_luminosity (  node_B02_t * const self,
+                                    node_B02_luminosity_t const * const data,
                                     uint32_t * const next_time_ms)
 {
     assert(self         != NULL);
     assert(data         != NULL);
     assert(next_time_ms != NULL);
 
-    *next_time_ms = NODE_T01_LUMINOSITY_PERIOD_MS;
+    *next_time_ms = NODE_B02_LUMINOSITY_PERIOD_MS;
 
     if (data->is_valid == true)
     {
-        if (data->lux < NODE_T01_DARKNESS_LEVEL_LUX)
+        if (data->lux < NODE_B02_DARKNESS_LEVEL_LUX)
         {
             self->is_dark = true;
         }
@@ -237,19 +259,19 @@ void node_T01_process_luminosity (  node_T01_t * const self,
     return;
 }
 
-void node_T01_process_humidity (node_T01_t * const self,
-                                node_T01_humidity_t const * const data,
-                                uint32_t * const next_time_ms)
+void node_B02_process_temperature ( node_B02_t * const self,
+                                    node_B02_temperature_t const * const data,
+                                    uint32_t * const next_time_ms)
 {
     assert(self         != NULL);
     assert(data         != NULL);
     assert(next_time_ms != NULL);
 
-    *next_time_ms = NODE_T01_HUMIDITY_PERIOD_MS;
+    *next_time_ms = NODE_B02_TEMPERATURE_PERIOD_MS;
 
-    self->humidity = *data;
+    self->temperature = *data;
 
-    if (self->humidity.is_valid == true)
+    if (self->temperature.is_valid == true)
     {
         if (self->send_msg_buffer_size != ARRAY_SIZE(self->send_msg_buffer))
         {
@@ -261,10 +283,9 @@ void node_T01_process_humidity (node_T01_t * const self,
             ++j;
             self->send_msg_buffer[i].header.dest_array_size = j;
 
-            self->send_msg_buffer[i].cmd_id = UPDATE_HUMIDITY;
-            self->send_msg_buffer[i].value_0 = (int32_t)(self->humidity.pressure_hPa);
-            self->send_msg_buffer[i].value_1 = (int32_t)(self->humidity.humidity_pct);
-            self->send_msg_buffer[i].value_2 = self->humidity.temperature_C;
+            self->send_msg_buffer[i].cmd_id = UPDATE_TEMPERATURE;
+            self->send_msg_buffer[i].value_0 = (int32_t)(self->temperature.pressure_hPa);
+            self->send_msg_buffer[i].value_2 = self->temperature.temperature_C;
 
             ++self->send_msg_buffer_size;
         }
@@ -273,45 +294,7 @@ void node_T01_process_humidity (node_T01_t * const self,
     return;
 }
 
-void node_T01_process_door_state (  node_T01_t * const self,
-                                    bool is_door_open,
-                                    uint32_t * const next_time_ms)
-{
-    assert(self         != NULL);
-    assert(next_time_ms != NULL);
-
-    *next_time_ms = NODE_T01_DOOR_STATE_PERIOD_MS;
-
-    self->is_door_open = is_door_open;
-
-    if (self->send_msg_buffer_size != ARRAY_SIZE(self->send_msg_buffer))
-    {
-        const size_t i = self->send_msg_buffer_size;
-        size_t j = 0U;
-
-        self->send_msg_buffer[i].header.source = self->id;
-        self->send_msg_buffer[i].header.dest_array[j] = NODE_B01;
-        ++j;
-        self->send_msg_buffer[i].header.dest_array_size = j;
-
-        self->send_msg_buffer[i].cmd_id = UPDATE_DOOR_STATE;
-
-        if (self->is_door_open == true)
-        {
-            self->send_msg_buffer[i].value_0 = 1;
-        }
-        else
-        {
-            self->send_msg_buffer[i].value_0 = 0;
-        }
-
-        ++self->send_msg_buffer_size;
-    }
-
-    return;
-}
-
-void node_T01_process_remote_button (node_T01_t * const self,
+void node_B02_process_remote_button (node_B02_t * const self,
                                     board_remote_button_t remote_button)
 {
     UNUSED(remote_button);
@@ -323,24 +306,18 @@ void node_T01_process_remote_button (node_T01_t * const self,
     return;
 }
 
-void node_T01_process_front_movement (  node_T01_t * const self,
-                                        uint32_t time_ms)
+void node_B02_process_door_movement (node_B02_t * const self,
+                                    uint32_t time_ms)
 {
     assert(self != NULL);
 
-    node_T01_update_time(self, time_ms);
+    node_B02_update_time(self, time_ms);
     const uint32_t light_duration_ms        = time_ms - self->light_start_time_ms;
-    const uint32_t display_duration_ms      = time_ms - self->display_start_time_ms;
     const uint32_t intrusion_duration_ms    = time_ms - self->intrusion_start_time_ms;
 
     if (self->mode == SILENCE_MODE)
     {
-        if (display_duration_ms > NODE_T01_DISPLAY_DURATION_MS)
-        {
-            self->display_start_time_ms = time_ms;
-        }
-
-        if (light_duration_ms > NODE_T01_LIGHT_DURATION_MS)
+        if (light_duration_ms > NODE_B02_LIGHT_DURATION_MS)
         {
             self->light_start_time_ms = time_ms;
 
@@ -352,7 +329,7 @@ void node_T01_process_front_movement (  node_T01_t * const self,
                     size_t j = 0U;
 
                     self->send_msg_buffer[i].header.source = self->id;
-                    self->send_msg_buffer[i].header.dest_array[j] = NODE_B02;
+                    self->send_msg_buffer[i].header.dest_array[j] = NODE_T01;
                     ++j;
                     self->send_msg_buffer[i].header.dest_array_size = j;
 
@@ -367,7 +344,7 @@ void node_T01_process_front_movement (  node_T01_t * const self,
 
     else if (self->mode == GUARD_MODE)
     {
-        if (intrusion_duration_ms > NODE_T01_INTRUSION_DURATION_MS)
+        if (intrusion_duration_ms > NODE_B02_INTRUSION_DURATION_MS)
         {
             self->intrusion_start_time_ms   = time_ms;
             self->light_start_time_ms       = time_ms;
@@ -380,7 +357,7 @@ void node_T01_process_front_movement (  node_T01_t * const self,
                 self->send_msg_buffer[i].header.source = self->id;
                 self->send_msg_buffer[i].header.dest_array[j] = NODE_B01;
                 ++j;
-                self->send_msg_buffer[i].header.dest_array[j] = NODE_B02;
+                self->send_msg_buffer[i].header.dest_array[j] = NODE_T01;
                 ++j;
                 self->send_msg_buffer[i].header.dest_array_size = j;
 
@@ -395,7 +372,64 @@ void node_T01_process_front_movement (  node_T01_t * const self,
     return;
 }
 
-void node_T01_process_rcv_msg ( node_T01_t * const self,
+void node_B02_process_front_movement (  node_B02_t * const self,
+                                        uint32_t time_ms)
+{
+    assert(self != NULL);
+
+    node_B02_process_door_movement(self, time_ms);
+
+    return;
+}
+
+void node_B02_process_veranda_movement (node_B02_t * const self,
+                                        uint32_t time_ms)
+{
+    assert(self != NULL);
+
+    node_B02_update_time(self, time_ms);
+    const uint32_t intrusion_duration_ms    = time_ms - self->intrusion_start_time_ms;
+    const uint32_t display_duration_ms      = time_ms - self->display_start_time_ms;
+
+    if (self->mode == SILENCE_MODE)
+    {
+        if (display_duration_ms > NODE_B02_DISPLAY_DURATION_MS)
+        {
+            self->display_start_time_ms = time_ms;
+        }
+    }
+
+    else if (self->mode == GUARD_MODE)
+    {
+        if (intrusion_duration_ms > NODE_B02_INTRUSION_DURATION_MS)
+        {
+            self->intrusion_start_time_ms   = time_ms;
+            self->light_start_time_ms       = time_ms;
+
+            if (self->send_msg_buffer_size != ARRAY_SIZE(self->send_msg_buffer))
+            {
+                const size_t i = self->send_msg_buffer_size;
+                size_t j = 0U;
+
+                self->send_msg_buffer[i].header.source = self->id;
+                self->send_msg_buffer[i].header.dest_array[j] = NODE_B01;
+                ++j;
+                self->send_msg_buffer[i].header.dest_array[j] = NODE_T01;
+                ++j;
+                self->send_msg_buffer[i].header.dest_array_size = j;
+
+                self->send_msg_buffer[i].cmd_id = SET_INTRUSION;
+                self->send_msg_buffer[i].value_0 = (int32_t)(INTRUSION_ON);
+
+                ++self->send_msg_buffer_size;
+            }
+        }
+    }
+
+    return;
+}
+
+void node_B02_process_rcv_msg ( node_B02_t * const self,
                                 node_msg_t const * const rcv_msg,
                                 uint32_t time_ms)
 {
@@ -422,7 +456,7 @@ void node_T01_process_rcv_msg ( node_T01_t * const self,
         }
     }
 
-    node_T01_update_time(self, time_ms);
+    node_B02_update_time(self, time_ms);
     const uint32_t light_duration_ms        = time_ms - self->light_start_time_ms;
     const uint32_t intrusion_duration_ms    = time_ms - self->intrusion_start_time_ms;
 
@@ -435,13 +469,13 @@ void node_T01_process_rcv_msg ( node_T01_t * const self,
         self->light_start_time_ms       = 0U;
     }
 
-    else if (rcv_msg->cmd_id == SET_INTRUSION)
+    else if (rcv_msg->cmd_id == SET_INTRUSION) 
     {
         const node_intrusion_id_t intrusion_id = (node_intrusion_id_t)(rcv_msg->value_0);
 
         if (intrusion_id == INTRUSION_ON)
         {
-            if (intrusion_duration_ms > NODE_T01_INTRUSION_DURATION_MS)
+            if (intrusion_duration_ms > NODE_B02_INTRUSION_DURATION_MS)
             {
                 self->intrusion_start_time_ms   = time_ms;
                 self->light_start_time_ms       = time_ms;
@@ -459,7 +493,7 @@ void node_T01_process_rcv_msg ( node_T01_t * const self,
 
         if (light_id == LIGHT_ON)
         {
-            if (light_duration_ms > NODE_T01_LIGHT_DURATION_MS)
+            if (light_duration_ms > NODE_B02_LIGHT_DURATION_MS)
             {
                 self->light_start_time_ms = time_ms;
             }
@@ -473,33 +507,33 @@ void node_T01_process_rcv_msg ( node_T01_t * const self,
     return;
 }
 
-void node_T01_get_light_data (  node_T01_t const * const self,
+void node_B02_get_light_data (  node_B02_t const * const self,
                                 uint32_t * const disable_time_ms)
 {
     assert(self             != NULL);
     assert(disable_time_ms  != NULL);
 
-    *disable_time_ms = NODE_T01_LIGHT_DURATION_MS;
+    *disable_time_ms = NODE_B02_DISPLAY_DURATION_MS;
 
     return;
 }
 
-void node_T01_get_display_data (node_T01_t const * const self,
-                                node_T01_humidity_t * const data,
+void node_B02_get_display_data (node_B02_t const * const self,
+                                node_B02_temperature_t * const data,
                                 uint32_t * const disable_time_ms)
 {
     assert(self             != NULL);
     assert(data             != NULL);
     assert(disable_time_ms  != NULL);
 
-    *disable_time_ms = NODE_T01_DISPLAY_DURATION_MS;
+    *disable_time_ms = NODE_B02_DISPLAY_DURATION_MS;
 
-    *data = self->humidity;
+    *data = self->temperature;
 
     return;
 }
 
-int node_T01_get_msg (  node_T01_t * const self,
+int node_B02_get_msg (  node_B02_t * const self,
                         node_msg_t *msg,
                         std_error_t * const error)
 {

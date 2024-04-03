@@ -6,10 +6,12 @@
 #ifndef NODE_T01_H
 #define NODE_T01_H
 
-#define NODE_T01_LIGHT_AND_DISPLAY_DURATION_MS  (30U * 1000U)       // 30 seconds
-#define NODE_T01_LUMINOSITY_PERIOD_MS           (2U * 60U * 1000U)  // 2 min
-#define NODE_T01_HUMIDITY_PERIOD_MS             (2U * 60U * 1000U)  // 2 min
-#define NODE_T01_DOOR_STATE_PERIOD_MS           (2U * 60U * 1000U)  // 2 min
+#define NODE_T01_LIGHT_DURATION_MS      (30U * 1000U)       // 30 seconds
+#define NODE_T01_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
+#define NODE_T01_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
+#define NODE_T01_LUMINOSITY_PERIOD_MS   (2U * 60U * 1000U)  // 2 min
+#define NODE_T01_HUMIDITY_PERIOD_MS     (2U * 60U * 1000U)  // 2 min
+#define NODE_T01_DOOR_STATE_PERIOD_MS   (2U * 60U * 1000U)  // 2 min
 
 #define NODE_T01_DARKNESS_LEVEL_LUX 5.5F
 #define NODE_T01_HIGH_TEMPERATURE_C 25.0F
@@ -105,17 +107,21 @@ int node_T01_get_msg (  node_T01_t * const self,
 // Private
 typedef struct node_T01
 {
+    node_id_t id;
+
     node_T01_state_t state;
 
     node_mode_id_t mode;
     bool is_dark;
-    bool is_door_open;
 
-    uint32_t light_and_display_start_time_ms;
+    uint32_t light_start_time_ms;
+    uint32_t display_start_time_ms;
+    uint32_t intrusion_start_time_ms;
 
     node_T01_humidity_t humidity;
+    bool is_door_open;
 
-    node_msg_t send_msg_buffer[4];
+    node_msg_t send_msg_buffer[8];
     size_t send_msg_buffer_size;
 
 } node_T01_t;

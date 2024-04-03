@@ -21,10 +21,12 @@ target_sources(tests
     PRIVATE
         src/devices/mcp23017_expander.test.cpp
         src/node_T01.test.cpp
+        src/node_B02.test.cpp
 )
 target_compile_options(tests
     PRIVATE
         -Wno-missing-field-initializers
+        -Wno-c99-designator
 )
 target_compile_features(tests
     PRIVATE

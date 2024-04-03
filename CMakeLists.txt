@@ -15,7 +15,15 @@ else()
 endif()
 
 # Project name
-project(blackpill_node LANGUAGES C ASM VERSION 1.0.0.0)
+project(blackpill_node)
+
+set(VERSION_MAJOR 1)
+set(VERSION_MINOR 0)
+set(VERSION_PATCH 0)
+configure_file(src/version.h.in version.h @ONLY)
+
+enable_language(CXX)
+enable_language(C)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -115,6 +123,17 @@ FetchContent_Declare(
 FetchContent_GetProperties(bme280_driver)
 if(NOT bme280_driver_POPULATED)
     FetchContent_Populate(bme280_driver)
+endif()
+
+FetchContent_Declare(
+    bmp280_driver
+    SOURCE_DIR      ${PROJECT_SOURCE_DIR}/external/bmp280_driver
+    GIT_REPOSITORY  https://github.com/boschsensortec/BMP2-Sensor-API.git
+    GIT_TAG         v1.0.1
+)
+FetchContent_GetProperties(bmp280_driver)
+if(NOT bmp280_driver_POPULATED)
+    FetchContent_Populate(bmp280_driver)
 endif()
 
 FetchContent_Declare(
@@ -241,6 +260,8 @@ target_sources(blackpill_under_testing
         src/devices/mcp23017_expander.c
         src/node_T01.h
         src/node_T01.c
+        src/node_B02.h
+        src/node_B02.c
 )
 
 # Create blackpill firmware target
@@ -248,6 +269,7 @@ add_library(blackpill_firmware INTERFACE)
 target_link_libraries(blackpill_firmware INTERFACE blackpill_bootloader)
 target_link_libraries(blackpill_firmware INTERFACE blackpill_under_testing)
 target_link_libraries(blackpill_firmware INTERFACE vs1838_control)
+target_link_libraries(blackpill_firmware INTERFACE bmp280_sensor)
 target_include_directories(blackpill_firmware
     INTERFACE
         external/free_rtos/include
@@ -255,9 +277,11 @@ target_include_directories(blackpill_firmware
         external/w5500_driver/Ethernet
         external/lwjson_parser/lwjson/src/include
         external/bme280_driver
+        external/bmp280_driver
 )
 target_sources(blackpill_firmware
     INTERFACE
+        ${CMAKE_CURRENT_BINARY_DIR}/version.h
         src/board.h
         src/board.c
         src/board.type.h
@@ -288,8 +312,6 @@ target_sources(blackpill_firmware
 
         src/board_T01.h
         src/board_T01.c
-        src/node_T01.h
-        src/node_T01.c
 
         src/devices/ssd1306_display.h
         src/devices/ssd1306_display.c
@@ -335,11 +357,16 @@ target_sources(blackpill_firmware
         external/bme280_driver/bme280_defs.h
         external/bme280_driver/bme280.h
         external/bme280_driver/bme280.c
+
+        external/bmp280_driver/bmp2_defs.h
+        external/bmp280_driver/bmp2.h
+        external/bmp280_driver/bmp2.c
 )
 target_compile_definitions(blackpill_firmware
     INTERFACE
         _WIZCHIP_=5500
         BME280_FLOAT_ENABLE
+        BMP2_DOUBLE_COMPENSATION
 )
 
 set_source_files_properties(external/w5500_driver/Ethernet/socket.c

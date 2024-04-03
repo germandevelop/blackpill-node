@@ -144,28 +144,13 @@ void node_task (void *parameters)
 
                 if (node_mapper_deserialize_message(work_tcp_msg->data, &node_msg, &error) == STD_SUCCESS)
                 {
-                    bool is_dest_node = false;
+                    node_msg_t *free_msg;
 
-                    for (size_t i = 0U;i < node_msg.header.dest_array_size; ++i)
+                    if (xQueueReceive(free_msg_queue, (void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT) == pdPASS)
                     {
-                        if (node_msg.header.dest_array[i] == config.id)
-                        {
-                            is_dest_node = true;
+                        memcpy((void*)(free_msg), (const void*)(&node_msg), sizeof(node_msg_t));
 
-                            break;
-                        }
-                    }
-
-                    if (is_dest_node == true)
-                    {
-                        node_msg_t *free_msg;
-
-                        if (xQueueReceive(free_msg_queue, (void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT) == pdPASS)
-                        {
-                            memcpy((void*)(free_msg), (const void*)(&node_msg), sizeof(node_msg_t));
-
-                            xQueueSend(work_msg_queue, (const void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT);
-                        }
+                        xQueueSend(work_msg_queue, (const void*)&free_msg, RTOS_QUEUE_TICKS_TO_WAIT);
                     }
                 }
                 else

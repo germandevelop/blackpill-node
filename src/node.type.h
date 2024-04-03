@@ -25,7 +25,7 @@ typedef struct node_msg
 
     // Payload - body
     node_command_id_t cmd_id;
-    uint32_t value_0;
+    int32_t value_0;
     int32_t value_1;
     float value_2;
 

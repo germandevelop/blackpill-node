@@ -36,17 +36,21 @@ void node_mapper_serialize_message (node_msg_t const * const msg, char *raw_data
 
     int data_size = (-1);
 
-    if ((msg->cmd_id == SET_MODE) || (msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION))
+    if ((msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION))
     {
         data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"value_id\":%ld}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
     }
+    else if (msg->cmd_id == UPDATE_HUMIDITY)
+    {
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%ld,\"hum_pct\":%ld,\"temp_c\":%.1f}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_1, msg->value_2);
+    }
     else if (msg->cmd_id == UPDATE_TEMPERATURE)
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%lu,\"hum_pct\":%ld,\"temp_c\":%.1f}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_1, msg->value_2);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%ld,\"temp_c\":%.1f}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_2);
     }
     else if (msg->cmd_id == UPDATE_DOOR_STATE)
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"door_state\":%lu}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"door_state\":%ld}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
     }
     else
     {
@@ -57,7 +61,7 @@ void node_mapper_serialize_message (node_msg_t const * const msg, char *raw_data
 
     if (data_size > 0)
     {
-        *raw_data_size = (size_t)data_size;
+        *raw_data_size = (size_t)(data_size);
     }
 
     return;
@@ -112,7 +116,7 @@ int node_mapper_deserialize_message (const char *raw_data, node_msg_t * const ms
             msg->cmd_id = DO_NOTHING;
         }
 
-        if ((msg->cmd_id == SET_MODE) || (msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION))
+        if ((msg->cmd_id == SET_MODE) || (msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION) || (msg->cmd_id == SET_WARNING))
         {
             is_token_parsed = ((token = lwjson_find(&lwjson, "data")) != NULL) && (token->type == LWJSON_TYPE_OBJECT);
 
@@ -124,14 +128,14 @@ int node_mapper_deserialize_message (const char *raw_data, node_msg_t * const ms
 
                 if (is_token_parsed == true)
                 {
-                    msg->value_0 = tkn->u.num_int;
+                    msg->value_0 = (int32_t)(tkn->u.num_int);
                 }
             }
         }
     }
     else
     {
-        std_error_catch_custom(error, (int)parser_code, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)(parser_code), DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         exit_code = STD_FAILURE;
     }
