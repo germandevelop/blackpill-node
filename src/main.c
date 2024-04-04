@@ -29,7 +29,7 @@ int main ()
     watchdog_init();
 
     board_config_t board_config;
-    board_config.refresh_watchdog_callback  = watchdog_refresh;
+    board_config.refresh_watchdog_callback  = watchdog_refresh; 
     board_config.watchdog_timeout_ms        = 25U * 1000U;
 
     if (board_init(&board_config, NULL) != SUCCESS)

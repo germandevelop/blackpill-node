@@ -15,8 +15,6 @@
 #include "semphr.h"
 #include "timers.h"
 
-#include "lfs.h"
-
 #include "board.type.h"
 #include "board.uart_2.h"
 #include "board.spi_1.h"
@@ -28,12 +26,14 @@
 #include "board.timer_3.h"
 
 #include "devices/mcp23017_expander.h"
-#include "devices/w25q32bv_flash.h"
 #include "devices/vs1838_control.h"
 
-#include "board_T01.h"
 #include "node.h"
 #include "tcp_client.h"
+#include "storage.h"
+#include "board_T01.h"
+
+#include "version.h"
 
 #include "logger.h"
 #include "std_error/std_error.h"
@@ -51,13 +51,10 @@
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
 
-#define LFS_MIN_READ_BLOCK_SIZE 16U
-#define LFS_MIN_PROG_BLOCK_SIZE 16U
-#define LFS_ERASE_CYCLES        500
-#define LFS_CACHE_SIZE          512U
-#define LFS_LOOKAHEAD_SIZE      128U
+#define UART_TIMEOUT_MS (1U * 1000U)    // 1 sec
+#define SPI_TIMEOUT_MS  (1U * 1000U)    // 1 sec
+#define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
-#define I2C_TIMEOUT_MS                          (1U * 1000U)    // 1 sec
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT        5U
 #define PHOTORESISTOR_MEAUSEREMENT_TIMEOUT_MS   (2U * 1000U)
 #define PHOTORESISTOR_INITIAL_PERIOD_MS         (30U * 1000U)   // 30 sec
@@ -69,19 +66,16 @@ static TaskHandle_t task;
 static SemaphoreHandle_t status_led_mutex;
 static SemaphoreHandle_t remote_button_mutex;
 static TimerHandle_t photoresistor_timer;
+static SemaphoreHandle_t spi_1_mutex;
+static SemaphoreHandle_t i2c_1_mutex;
 
 static board_config_t config;
 
-static mcp23017_expander_t mcp23017_expander;
-static w25q32bv_flash_t w25q32bv_flash;
-static vs1838_control_t vs1838_control;
 static board_led_color_t status_led_color;
+static mcp23017_expander_t mcp23017_expander;
+static storage_t storage;
+static vs1838_control_t vs1838_control;
 static board_remote_button_t latest_remote_button;
-
-static uint8_t lfs_read_buffer[LFS_CACHE_SIZE];
-static uint8_t lfs_prog_buffer[LFS_CACHE_SIZE];
-static uint8_t lfs_lookahead_buffer[LFS_LOOKAHEAD_SIZE];
-//static uint8_t lfs_file_buffer[LFS_CACHE_SIZE];
 
 
 static int board_malloc (std_error_t * const error);
@@ -89,23 +83,13 @@ static void board_task (void *parameters);
 static void board_photoresistor_timer (TimerHandle_t timer);
 
 static void board_init_logger ();
-static void board_init_filesystem ();
-static void board_init_tcp_client ();
 static void board_init_expander ();
+static void board_init_storage ();
+static void board_init_node ();
+static void board_init_tcp_client ();
 static void board_init_remote_control ();
 
-static void board_print_uart_2 (const uint8_t *data, uint16_t data_size);
-
 static void board_spi_1_init_select_gpio ();
-static void board_w25q32bv_spi_1_select ();
-static void board_w25q32bv_spi_1_unselect ();
-static void board_w5500_spi_1_select ();
-static void board_w5500_spi_1_unselect ();
-static void board_spi_1_lock ();
-static void board_spi_1_unlock ();
-
-static void board_i2c_1_lock ();
-static void board_i2c_1_unlock ();
 
 static void board_timer_2_ic_isr_callback (uint32_t captured_value);
 
@@ -113,13 +97,17 @@ static void board_update_status_led (board_led_color_t led_color);
 static int board_set_status_led_color (board_led_color_t led_color, std_error_t * const error);
 static int board_read_photoresistor (uint32_t * const photoresistor_adc, std_error_t * const error);
 
-static int board_lfs_block_device_read (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, void *raw_data, lfs_size_t size);
-static int board_lfs_block_device_prog (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, const void *raw_data, lfs_size_t size);
-static int board_lfs_block_device_erase (const struct lfs_config *config, lfs_block_t sector_number);
-static int board_lfs_block_device_sync (const struct lfs_config *config);
-static int board_lfs_block_device_lock (const struct lfs_config *config);
-static int board_lfs_block_device_unlock (const struct lfs_config *config);
-static void board_lfs_init_config (struct lfs_config *lfs_config);
+static void board_uart_2_print (const uint8_t *data, uint16_t data_size);
+
+static void board_i2c_1_lock ();
+static void board_i2c_1_unlock ();
+
+static void board_spi_1_lock ();
+static void board_spi_1_unlock ();
+static void board_spi_1_select_w25q32bv ();
+static void board_spi_1_unselect_w25q32bv ();
+static void board_spi_1_select_w5500 ();
+static void board_spi_1_unselect_w5500 ();
 
 int board_init (board_config_t const * const init_config, std_error_t * const error)
 {
@@ -140,32 +128,23 @@ void board_task (void *parameters)
 {
     UNUSED(parameters);
 
+    LOG("Board : firmware version = %s.%s.%s\r\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+
     std_error_t error;
     std_error_init(&error);
 
     status_led_color = NO_COLOR;
 
     board_init_expander();
-    board_init_filesystem();
+    board_init_storage();
+    /*board_init_node();
     board_init_tcp_client();
     board_init_remote_control();
 
     {
-        node_config_t config;
-        config.id                       = NODE_T01;
-        config.receive_msg_callback     = board_T01_process_rcv_node_msg;
-        config.send_tcp_msg_callback    = tcp_client_send_message;
-
-        if (node_init(&config, &error) != STD_SUCCESS)
-        {
-            LOG("Board : %s\r\n", error.text);
-        }
-    }
-
-    {
         board_T01_config_t config;
         config.mcp23017_expander            = &mcp23017_expander;
-        config.w25q32bv_flash               = &w25q32bv_flash;
+        config.storage                      = &storage;
         config.update_status_led_callback   = board_update_status_led;
         config.send_node_msg_callback       = node_send_msg;
 
@@ -173,7 +152,7 @@ void board_task (void *parameters)
         {
             LOG("Board : %s\r\n", error.text);
         }
-    }
+    }*/
 
     xTimerStart(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
 
@@ -207,7 +186,8 @@ void board_task (void *parameters)
             board_T01_process_remote_button(current_remote_button);
         }
 
-        LOG("Board : feed watchdog\r\n");
+        LOG("Board [watchdog] : feed\r\n");
+
         config.refresh_watchdog_callback();
     }
     return;
@@ -219,7 +199,7 @@ void board_init_logger ()
     int exit_code = board_uart_2_init(NULL);
 
     logger_config_t logger_config;
-    logger_config.write_array_callback = board_print_uart_2;
+    logger_config.write_array_callback = board_uart_2_print;
 
     if (exit_code != STD_SUCCESS)
     {
@@ -231,82 +211,105 @@ void board_init_logger ()
     return;
 }
 
-void board_init_filesystem ()
+void board_init_expander ()
 {
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Board : Init SPI_1\r\n");
+    LOG("Board [I2C_1] : init\r\n");
+
+    int exit_code = board_i2c_1_init(&error);
+
+    if (exit_code != STD_SUCCESS)
+    {
+        LOG("Board [I2C_1] : %s\r\n", error.text);
+
+        return;
+    }
+
+    LOG("Board [expander] : init (MCP23017)\r\n");
+
+    mcp23017_expander_config_t config;
+    config.write_i2c_callback   = board_i2c_1_write_register;
+    config.read_i2c_callback    = board_i2c_1_read_register;
+    config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
+
+    if (mcp23017_expander_init(&mcp23017_expander, &config, &error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error.text);
+    }
+
+    if (mcp23017_expander_set_port_direction(&mcp23017_expander, PORT_A, OUTPUT_DIRECTION, &error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error.text);
+    }
+    if (mcp23017_expander_set_port_out(&mcp23017_expander, PORT_A, LOW_GPIO, &error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error.text);
+    }
+
+    if (mcp23017_expander_set_port_direction(&mcp23017_expander, PORT_B, OUTPUT_DIRECTION, &error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error.text);
+    }
+    if (mcp23017_expander_set_port_out(&mcp23017_expander, PORT_B, LOW_GPIO, &error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error.text);
+    }
+
+    return;
+}
+
+void board_init_storage ()
+{
+    std_error_t error;
+    std_error_init(&error);
+
+    LOG("Board [SPI_1] : init\r\n");
 
     board_spi_1_init_select_gpio();
-    int exit_code = board_spi_1_init(&error);
 
-    if (exit_code != STD_SUCCESS)
+    if (board_spi_1_init(&error) != STD_SUCCESS)
     {
-        LOG("Board : %s\r\n", error.text);
+        LOG("Board [SPI_1] : %s\r\n", error.text);
 
         return;
     }
 
-    LOG("Board : Init Flash (W25Q32BV)\r\n");
-    
-    w25q32bv_flash_config_t w25q32bv_flash_config;
-    w25q32bv_flash_config.spi_select_callback   = board_w25q32bv_spi_1_select;
-    w25q32bv_flash_config.spi_unselect_callback = board_w25q32bv_spi_1_unselect;
-    w25q32bv_flash_config.spi_tx_rx_callback    = board_spi_1_read_write;
-    w25q32bv_flash_config.delay_callback        = vTaskDelay;
+    LOG("Board [storage] : init\r\n");
 
-    w25q32bv_flash_init(&w25q32bv_flash, &w25q32bv_flash_config);
+    storage_config_t config;
+    config.spi_lock_callback        = board_spi_1_lock;
+    config.spi_unlock_callback      = board_spi_1_unlock;
+    config.spi_select_callback      = board_spi_1_select_w25q32bv;
+    config.spi_unselect_callback    = board_spi_1_unselect_w25q32bv;
+    config.spi_tx_rx_callback       = board_spi_1_read_write;
+    config.spi_timeout_ms           = SPI_TIMEOUT_MS;
+    config.delay_callback           = vTaskDelay;
 
-    exit_code = w25q32bv_flash_release_power_down(&w25q32bv_flash, &error);
-
-    if (exit_code != STD_SUCCESS)
+    if (storage_init(&storage, &config, &error) != STD_SUCCESS)
     {
-        LOG("Board : %s\r\n", error.text);
-
-        return;
+        LOG("Board [storage] : %s\r\n", error.text);
     }
 
-    w25q32bv_flash_info_t flash_info;
-    exit_code = w25q32bv_flash_read_info(&w25q32bv_flash, &flash_info, &error);
+    return;
+}
 
-    if (exit_code != STD_FAILURE)
+void board_init_node ()
+{
+    std_error_t error;
+    std_error_init(&error);
+
+    LOG("Board [node] : init\r\n");
+
+    node_config_t config;
+    config.id                       = NODE_T01;
+    config.receive_msg_callback     = board_T01_process_node_msg;
+    config.send_tcp_msg_callback    = tcp_client_send_message;
+
+    if (node_init(&config, &error) != STD_SUCCESS)
     {
-        LOG("Board : Flash JEDEC ID : 0x%lX\r\n", flash_info.jedec_id);
-        LOG("Board : Flash capacity: %lu KBytes\r\n", flash_info.capacity_KByte);
-    }
-    else
-    {
-        LOG("%s\r\n", error.text);
-    }
-
-    LOG("Board : Init LittleFS\r\n");
-
-    struct lfs_config lfs_config = { 0 };
-    board_lfs_init_config(&lfs_config);
-
-    lfs_t lfs;
-    int lfs_error = lfs_mount(&lfs, &lfs_config);
-
-    if (lfs_error != 0)
-    {
-        LOG("Board : Format LittleFS\r\n");
-
-        lfs_format(&lfs, &lfs_config);
-        lfs_error = lfs_mount(&lfs, &lfs_config);
-    }
-
-    if (lfs_error == 0)
-    {
-        LOG("Board : Mount LittleFS success\r\n");
-    }
-    lfs_unmount(&lfs);
-
-    exit_code = w25q32bv_flash_power_down(&w25q32bv_flash, &error);
-
-    if (exit_code != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
+        LOG("Board [node] : %s\r\n", error.text);
     }
 
     return;
@@ -317,18 +320,18 @@ void board_init_tcp_client ()
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Board : Init EXTI_1\r\n");
+    LOG("Board [EXTI_1] : init\r\n");
 
     int exit_code = board_exti_1_init(tcp_client_ISR, &error);
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("Board : %s\r\n", error.text);
+        LOG("Board [EXTI_1] : %s\r\n", error.text);
 
         return;
     }
 
-    LOG("Board : Init TCP-Client\r\n");
+    LOG("Board [tcp-client] : init\r\n");
 
     tcp_client_config_t config = { 0 };
 
@@ -336,10 +339,11 @@ void board_init_tcp_client ()
 
     config.spi_lock_callback        = board_spi_1_lock;
     config.spi_unlock_callback      = board_spi_1_unlock;
-    config.spi_select_callback      = board_w5500_spi_1_select;
-    config.spi_unselect_callback    = board_w5500_spi_1_unselect;
+    config.spi_select_callback      = board_spi_1_select_w5500;
+    config.spi_unselect_callback    = board_spi_1_unselect_w5500;
     config.spi_read_callback        = board_spi_1_read;
     config.spi_write_callback       = board_spi_1_write;
+    config.spi_timeout_ms           = SPI_TIMEOUT_MS;
 
     config.mac_address[0] = 0xEA;
     config.mac_address[1] = 0x11;
@@ -367,55 +371,7 @@ void board_init_tcp_client ()
 
     if (tcp_client_init(&config, &error) != STD_SUCCESS)
     {
-        LOG("Board : %s\r\n", error.text);
-    }
-    return;
-}
-
-void board_init_expander ()
-{
-    std_error_t error;
-    std_error_init(&error);
-
-    LOG("Board : Init I2C_1\r\n");
-
-    int exit_code = board_i2c_1_init(&error);
-
-    if (exit_code != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
-
-        return;
-    }
-
-    LOG("Board : Init Expander (MCP23017)\r\n");
-
-    mcp23017_expander_config_t config;
-    config.write_i2c_callback   = board_i2c_1_write_register;
-    config.read_i2c_callback    = board_i2c_1_read_register;
-    config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
-
-    if (mcp23017_expander_init(&mcp23017_expander, &config, &error) != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
-    }
-
-    if (mcp23017_expander_set_port_direction(&mcp23017_expander, PORT_A, OUTPUT_DIRECTION, &error) != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
-    }
-    if (mcp23017_expander_set_port_out(&mcp23017_expander, PORT_A, LOW_GPIO, &error) != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
-    }
-
-    if (mcp23017_expander_set_port_direction(&mcp23017_expander, PORT_B, OUTPUT_DIRECTION, &error) != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
-    }
-    if (mcp23017_expander_set_port_out(&mcp23017_expander, PORT_B, LOW_GPIO, &error) != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
+        LOG("Board [tcp-client] : %s\r\n", error.text);
     }
 
     return;
@@ -426,7 +382,7 @@ void board_init_remote_control ()
     std_error_t error;
     std_error_init(&error);
 
-    LOG("Board : Init Remote control (VS1838)\r\n");
+    LOG("Board [remote control] : init (VS1838)\r\n");
 
     vs1838_control_config_t config;
     config.start_bit    = 1155U;
@@ -436,7 +392,7 @@ void board_init_remote_control ()
 
     vs1838_control_init(&vs1838_control, &config);
 
-    LOG("Board : Init TIMER_2\r\n");
+    LOG("Board [TIMER_2] : init\r\n");
 
     board_timer_2_config_t timer_2_config;
     timer_2_config.ic_isr_callback = board_timer_2_ic_isr_callback;
@@ -445,28 +401,12 @@ void board_init_remote_control ()
 
     if (exit_code != STD_SUCCESS)
     {
-        LOG("Board : %s\r\n", error.text);
+        LOG("Board [TIMER_2] : %s\r\n", error.text);
     }
 
-    LOG("Board : Init TIMER_3\r\n");
-
-    exit_code = board_timer_3_init(&error);
-    board_timer_3_deinit();
-
-    if (exit_code != STD_SUCCESS)
-    {
-        LOG("Board : %s\r\n", error.text);
-    }
     return;
 }
 
-
-void board_print_uart_2 (const uint8_t *data, uint16_t data_size)
-{
-    board_uart_2_write(data, data_size, 10U * 1000U, NULL);
-
-    return;
-}
 
 
 void board_spi_1_init_select_gpio ()
@@ -497,54 +437,6 @@ void board_spi_1_init_select_gpio ()
 
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    return;
-}
-
-void board_w25q32bv_spi_1_select ()
-{
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-
-    return;
-}
-
-void board_w25q32bv_spi_1_unselect ()
-{
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-
-    return;
-}
-
-void board_w5500_spi_1_select ()
-{
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-
-    return;
-}
-
-void board_w5500_spi_1_unselect ()
-{
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-
-    return;
-}
-
-void board_spi_1_lock ()
-{
-    return;
-}
-
-void board_spi_1_unlock ()
-{
-    return;
-}
-
-void board_i2c_1_lock ()
-{
-    return;
-}
-
-void board_i2c_1_unlock ()
-{
     return;
 }
 
@@ -670,7 +562,7 @@ void board_photoresistor_timer (TimerHandle_t timer)
     bool is_timer_started = false;
 
     bool is_lightning_on;
-    board_T01_get_lightning_status(&is_lightning_on);
+    board_T01_is_lightning_on(&is_lightning_on);
 
     if (is_lightning_on != true)
     {
@@ -764,8 +656,11 @@ int board_malloc (std_error_t * const error)
 {
     status_led_mutex    = xSemaphoreCreateMutex();
     remote_button_mutex = xSemaphoreCreateMutex();
+    spi_1_mutex         = xSemaphoreCreateMutex();
+    i2c_1_mutex         = xSemaphoreCreateMutex();
 
-    const bool are_semaphores_allocated = (status_led_mutex != NULL) && (remote_button_mutex != NULL);
+    const bool are_semaphores_allocated = (status_led_mutex != NULL) && (remote_button_mutex != NULL) &&
+                                            (spi_1_mutex != NULL) && (i2c_1_mutex != NULL);
 
     photoresistor_timer = xTimerCreate("photoresistor", (PHOTORESISTOR_INITIAL_PERIOD_MS / portTICK_PERIOD_MS), pdFALSE, NULL, board_photoresistor_timer);
 
@@ -775,6 +670,8 @@ int board_malloc (std_error_t * const error)
     {
         vSemaphoreDelete(status_led_mutex);
         vSemaphoreDelete(remote_button_mutex);
+        vSemaphoreDelete(spi_1_mutex);
+        vSemaphoreDelete(i2c_1_mutex);
         xTimerDelete(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
@@ -795,152 +692,65 @@ int board_malloc (std_error_t * const error)
 
 
 
-int board_lfs_block_device_read (const struct lfs_config *config,
-                                lfs_block_t sector_number,
-                                lfs_off_t sector_offset,
-                                void *raw_data,
-                                lfs_size_t size)
+void board_uart_2_print (const uint8_t *data, uint16_t data_size)
 {
-    const w25q32bv_flash_t *flash = (const w25q32bv_flash_t *)config->context;
+    board_uart_2_write(data, data_size, UART_TIMEOUT_MS, NULL);
 
-    const int exit_code = w25q32bv_flash_read_data_fast(flash, (uint8_t*)raw_data, (uint32_t)size, (uint32_t)sector_number, (uint32_t)sector_offset, NULL);
-
-    return exit_code;
+    return;
 }
 
-int board_lfs_block_device_prog (const struct lfs_config *config,
-                                lfs_block_t sector_number,
-                                lfs_off_t sector_offset,
-                                const void *raw_data,
-                                lfs_size_t size)
+void board_i2c_1_lock ()
 {
-    int exit_code = STD_FAILURE;
+    xSemaphoreTake(i2c_1_mutex, portMAX_DELAY);
 
-    const w25q32bv_flash_t *flash = (const w25q32bv_flash_t *)config->context;
-
-    uint32_t page_number = (((uint32_t)(sector_number)*flash->sector_size) / flash->page_size) + ((uint32_t)(sector_offset) / flash->page_size);
-    uint32_t page_offset = (uint32_t)(sector_offset) % flash->page_size;
-
-    uint8_t *data = (uint8_t *)raw_data;
-    uint32_t data_size = (uint32_t)size;
-
-    const uint32_t page_free_size = flash->page_size - page_offset;
-    uint32_t size_to_write = data_size;
-
-    if (data_size > page_free_size)
-    {
-        size_to_write = page_free_size;
-    }
-
-    while (true)
-    {
-        exit_code = w25q32bv_flash_enable_erasing_or_writing(flash, NULL);
-
-        if (exit_code != STD_SUCCESS)
-        {
-            return exit_code;
-        }
-
-        exit_code = w25q32bv_flash_write_page(flash, data, size_to_write, page_number, page_offset, NULL);
-
-        if (exit_code != STD_SUCCESS)
-        {
-            return exit_code;
-        }
-
-        exit_code = w25q32bv_flash_wait_erasing_or_writing(flash, NULL);
-
-        if (exit_code != STD_SUCCESS)
-        {
-            return exit_code;
-        }
-
-        if (data_size > size_to_write)
-        {
-            ++page_number;
-            page_offset = 0U;
-            data += (uint8_t)(size_to_write);
-            data_size -= size_to_write;
-
-            if (data_size > flash->page_size)
-            {
-                size_to_write = flash->page_size;
-            }
-            else
-            {
-                size_to_write = data_size;
-            }
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return exit_code;
+    return;
 }
 
-int board_lfs_block_device_erase (const struct lfs_config *config, lfs_block_t sector_number)
+void board_i2c_1_unlock ()
 {
-    const w25q32bv_flash_t *flash = (w25q32bv_flash_t *)config->context;
+    xSemaphoreGive(i2c_1_mutex);
 
-    int exit_code = w25q32bv_flash_enable_erasing_or_writing(flash, NULL);
-
-    if (exit_code != STD_SUCCESS)
-    {
-        return exit_code;
-    }
-
-    exit_code = w25q32bv_flash_erase_sector(flash, (uint32_t)sector_number, NULL);
-
-    if (exit_code != STD_SUCCESS)
-    {
-        return exit_code;
-    }
-
-    exit_code = w25q32bv_flash_wait_erasing_or_writing(flash, NULL);
-
-    return exit_code;
+    return;
 }
 
-int board_lfs_block_device_sync (const struct lfs_config *config)
+void board_spi_1_lock ()
 {
-    return STD_SUCCESS;
+    xSemaphoreTake(spi_1_mutex, portMAX_DELAY);
+
+    return;
 }
 
-int board_lfs_block_device_lock (const struct lfs_config *config)
+void board_spi_1_unlock ()
 {
-    return STD_SUCCESS;
+    xSemaphoreGive(spi_1_mutex);
+
+    return;
 }
 
-int board_lfs_block_device_unlock (const struct lfs_config *config)
+void board_spi_1_select_w25q32bv ()
 {
-    return STD_SUCCESS;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+
+    return;
 }
 
-void board_lfs_init_config (struct lfs_config *lfs_config)
+void board_spi_1_unselect_w25q32bv ()
 {
-    // Block device operations
-    lfs_config->read    = board_lfs_block_device_read;
-    lfs_config->prog    = board_lfs_block_device_prog;
-    lfs_config->erase   = board_lfs_block_device_erase;
-    lfs_config->sync    = board_lfs_block_device_sync;
-    lfs_config->lock    = board_lfs_block_device_lock;
-    lfs_config->unlock  = board_lfs_block_device_unlock;
-    lfs_config->context = (void*)&w25q32bv_flash;
-    
-    // Block device configuration
-    lfs_config->read_size       = LFS_MIN_READ_BLOCK_SIZE;
-    lfs_config->prog_size       = LFS_MIN_PROG_BLOCK_SIZE;
-    lfs_config->block_size      = w25q32bv_flash.sector_size;
-    lfs_config->block_count     = w25q32bv_flash.sector_count;
-    lfs_config->cache_size      = LFS_CACHE_SIZE;
-    lfs_config->lookahead_size  = LFS_LOOKAHEAD_SIZE;
-    lfs_config->block_cycles    = LFS_ERASE_CYCLES;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
 
-    lfs_config->read_buffer         = lfs_read_buffer;
-    lfs_config->prog_buffer         = lfs_prog_buffer;
-    lfs_config->lookahead_buffer    = lfs_lookahead_buffer;
+    return;
+}
+
+void board_spi_1_select_w5500 ()
+{
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+
+    return;
+}
+
+void board_spi_1_unselect_w5500 ()
+{
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
 
     return;
 }

@@ -174,6 +174,7 @@ INSTANTIATE_TEST_SUITE_P(NodeT01TestFixture, NodeT01ParameterizedHumidity,
 
 class NodeT01ParameterizedDoorAndHumidity : public NodeT01TestFixture, public testing::WithParamInterface
     <std::tuple<
+        node_msg_t,
         bool,
         node_T01_humidity_t,
         node_T01_state_t,
@@ -184,12 +185,15 @@ class NodeT01ParameterizedDoorAndHumidity : public NodeT01TestFixture, public te
 TEST_P(NodeT01ParameterizedDoorAndHumidity, ProcessDoorAndHumidity)
 {
     // Arrange: create and set up a system under test
-    bool is_door_open               = std::get<0>(GetParam());
-    node_T01_humidity_t humidity    = std::get<1>(GetParam());
+    node_msg_t rcv_msg              = std::get<0>(GetParam());
+    bool is_door_open               = std::get<1>(GetParam());
+    node_T01_humidity_t humidity    = std::get<2>(GetParam());
+
+    node_T01_process_rcv_msg(&node, &rcv_msg, (NODE_T01_LIGHT_DURATION_MS * 2U));
 
     bool expected_is_door_open      = is_door_open;
-    node_T01_state_t expected_state = std::get<2>(GetParam());
-    size_t expected_msg_count       = std::get<3>(GetParam());
+    node_T01_state_t expected_state = std::get<3>(GetParam());
+    size_t expected_msg_count       = std::get<4>(GetParam());
 
     // Act: poke the system under test
     uint32_t next_time_ms;
@@ -197,7 +201,7 @@ TEST_P(NodeT01ParameterizedDoorAndHumidity, ProcessDoorAndHumidity)
     node_T01_process_humidity(&node, &humidity, &next_time_ms);
 
     node_T01_state_t result_state;
-    node_T01_get_state(&node, &result_state, (NODE_T01_LIGHT_DURATION_MS * 2U));
+    node_T01_get_state(&node, &result_state, ((NODE_T01_LIGHT_DURATION_MS * 2U) + 1U));
 
     // Assert: make unit test pass or fail
     EXPECT_EQ(node.is_door_open,                expected_is_door_open);
@@ -209,18 +213,67 @@ TEST_P(NodeT01ParameterizedDoorAndHumidity, ProcessDoorAndHumidity)
 INSTANTIATE_TEST_SUITE_P(NodeT01TestFixture, NodeT01ParameterizedDoorAndHumidity,
     testing::Values
     (
-        std::make_tuple(true, node_T01_humidity_t { .is_valid = false },
+        // Warnings enabled
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_ON) },
+                        true, node_T01_humidity_t { .is_valid = false },
                         node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 1U),
-        std::make_tuple(false, node_T01_humidity_t { .is_valid = false },
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_ON) },
+                        false, node_T01_humidity_t { .is_valid = false },
                         node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 1U),
-        std::make_tuple(true, node_T01_humidity_t { .temperature_C = (NODE_T01_LOW_TEMPERATURE_C - 1.0F), .is_valid = true },
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_ON) },
+                        true, node_T01_humidity_t { .temperature_C = (NODE_T01_LOW_TEMPERATURE_C - 1.0F), .is_valid = true },
                         node_T01_state_t { .is_warning_led_on = true, .is_msg_to_send = true }, 2U),
-        std::make_tuple(true, node_T01_humidity_t { .temperature_C = (NODE_T01_LOW_TEMPERATURE_C + 1.0F), .is_valid = true },
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_ON) },
+                        true, node_T01_humidity_t { .temperature_C = (NODE_T01_LOW_TEMPERATURE_C + 1.0F), .is_valid = true },
                         node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 2U),
-        std::make_tuple(false, node_T01_humidity_t { .temperature_C = (NODE_T01_HIGH_TEMPERATURE_C - 1.0F), .is_valid = true },
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_ON) },
+                        false, node_T01_humidity_t { .temperature_C = (NODE_T01_HIGH_TEMPERATURE_C - 1.0F), .is_valid = true },
                         node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 2U),
-        std::make_tuple(false, node_T01_humidity_t { .temperature_C = (NODE_T01_HIGH_TEMPERATURE_C + 1.0F), .is_valid = true },
-                        node_T01_state_t { .is_warning_led_on = true, .is_msg_to_send = true }, 2U)
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_ON) },
+                        false, node_T01_humidity_t { .temperature_C = (NODE_T01_HIGH_TEMPERATURE_C + 1.0F), .is_valid = true },
+                        node_T01_state_t { .is_warning_led_on = true, .is_msg_to_send = true }, 2U),
+
+        // Warnings disabled
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_OFF) },
+                        true, node_T01_humidity_t { .is_valid = false },
+                        node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 1U),
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_OFF) },
+                        false, node_T01_humidity_t { .is_valid = false },
+                        node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 1U),
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_OFF) },
+                        true, node_T01_humidity_t { .temperature_C = (NODE_T01_LOW_TEMPERATURE_C - 1.0F), .is_valid = true },
+                        node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 2U),
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_OFF) },
+                        true, node_T01_humidity_t { .temperature_C = (NODE_T01_LOW_TEMPERATURE_C + 1.0F), .is_valid = true },
+                        node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 2U),
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_OFF) },
+                        false, node_T01_humidity_t { .temperature_C = (NODE_T01_HIGH_TEMPERATURE_C - 1.0F), .is_valid = true },
+                        node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 2U),
+
+        std::make_tuple(node_msg_t { .header { .dest_array { [0] = NODE_T01 }, .dest_array_size = 1U },
+                        .cmd_id = SET_WARNING, .value_0 = (int32_t)(WARNING_OFF) },
+                        false, node_T01_humidity_t { .temperature_C = (NODE_T01_HIGH_TEMPERATURE_C + 1.0F), .is_valid = true },
+                        node_T01_state_t { .is_warning_led_on = false, .is_msg_to_send = true }, 2U)
     )
 );
 

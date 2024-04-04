@@ -417,14 +417,14 @@ void tcp_client_spi_unselect ()
 
 void tcp_client_spi_read_data (uint8_t *data, uint16_t size)
 {
-    config.spi_read_callback(data, size, 8U * 1000U, NULL);
+    config.spi_read_callback(data, size, config.spi_timeout_ms, NULL);
 
     return;
 }
 
 void tcp_client_spi_write_data (uint8_t *data, uint16_t size)
 {
-    config.spi_write_callback(data, size, 8U * 1000U, NULL);
+    config.spi_write_callback(data, size, config.spi_timeout_ms, NULL);
 
     return;
 }
@@ -433,14 +433,14 @@ uint8_t tcp_client_spi_read_byte ()
 {
     uint8_t byte;
 
-    config.spi_read_callback(&byte, sizeof(byte), 2U * 1000U, NULL);
+    config.spi_read_callback(&byte, sizeof(byte), config.spi_timeout_ms, NULL);
 
     return byte;
 }
 
 void tcp_client_spi_write_byte (uint8_t byte)
 {
-    config.spi_write_callback(&byte, sizeof(byte), 2U * 1000U, NULL);
+    config.spi_write_callback(&byte, sizeof(byte), config.spi_timeout_ms, NULL);
 
     return;
 }

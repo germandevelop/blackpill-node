@@ -30,29 +30,32 @@
 void w25q32bv_flash_init (w25q32bv_flash_t * const self,
                             w25q32bv_flash_config_t const * const config)
 {
-    w25q32bv_flash_set_config(self, config);
+    assert(self                             != NULL);
+    assert(config                           != NULL);
+    assert(config->spi_select_callback      != NULL);
+    assert(config->spi_unselect_callback    != NULL);
+    assert(config->spi_tx_rx_callback       != NULL);
+    assert(config->delay_callback           != NULL);
 
-    self->block_count       = 64U;
-    self->page_size         = 256U;
-    self->sector_size       = 4096U;
-    self->sector_count      = self->block_count * 16U;
-    self->page_count        = (self->sector_count * self->sector_size) / self->page_size;
-    self->block_size        = self->sector_size * 16U;
+    self->config = *config;
+
+    self->array.block_count     = 64U;
+    self->array.page_size       = 256U;
+    self->array.sector_size     = 4096U;
+    self->array.sector_count    = self->array.block_count * 16U;
+    self->array.page_count      = (self->array.sector_count * self->array.sector_size) / self->array.page_size;
+    self->array.block_size      = self->array.sector_size * 16U;
 
     return;
 }
 
-void w25q32bv_flash_set_config (w25q32bv_flash_t * const self,
-                                w25q32bv_flash_config_t const * const config)
+void w25q32bv_flash_get_array (w25q32bv_flash_t const * const self,
+                                w25q32bv_flash_array_t * const array)
 {
-    assert(self != NULL);
-    assert(config != NULL);
-    assert(config->spi_select_callback != NULL);
-    assert(config->spi_unselect_callback != NULL);
-    assert(config->spi_tx_rx_callback != NULL);
-    assert(config->delay_callback != NULL);
+    assert(self     != NULL);
+    assert(array    != NULL);
 
-    self->config = *config;
+    *array = self->array;
 
     return;
 }
@@ -64,9 +67,7 @@ int w25q32bv_flash_read_info (w25q32bv_flash_t const * const self,
     assert(self != NULL);
     assert(info != NULL);
 
-    self->config.spi_select_callback();
-
-    info->capacity_KByte = (self->sector_count * self->sector_size) / 1024U;
+    info->capacity_KByte = (self->array.sector_count * self->array.sector_size) / 1024U;
 
     const uint16_t data_size = 4U;
     uint8_t tx_data[data_size], rx_data[data_size];
@@ -77,17 +78,15 @@ int w25q32bv_flash_read_info (w25q32bv_flash_t const * const self,
     tx_data[3] = DUMMY_BYTE;
 
     self->config.spi_select_callback();
-
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
+    self->config.spi_unselect_callback();
 
     info->jedec_id = (rx_data[1] << 16) | (rx_data[2] << 8) | (rx_data[3] << 0);
-
-    self->config.spi_unselect_callback();
 
     return exit_code;
 }
 
-int w25q32bv_flash_read_data (w25q32bv_flash_t const * const self,
+int w25q32bv_flash_read_data (  w25q32bv_flash_t const * const self,
                                 uint8_t *data,
                                 uint32_t size,
                                 uint32_t sector_number,
@@ -97,9 +96,7 @@ int w25q32bv_flash_read_data (w25q32bv_flash_t const * const self,
     assert(self != NULL);
     assert(data != NULL);
 
-    self->config.spi_select_callback();
-
-    const uint32_t address = (sector_number * self->sector_size) + sector_offset;
+    const uint32_t address = (sector_number * self->array.sector_size) + sector_offset;
 
     const uint16_t data_size = 4U;
     uint8_t tx_data[data_size], rx_data[data_size];
@@ -109,11 +106,16 @@ int w25q32bv_flash_read_data (w25q32bv_flash_t const * const self,
     tx_data[2] = (address & 0xFF00) >> 8;
     tx_data[3] = address & 0xFF;
 
-    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
+    self->config.spi_select_callback();
 
-    uint8_t dummy_data[size];
-    exit_code = self->config.spi_tx_rx_callback(dummy_data, data, size, 5000U, error);
+    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
 
+    if (exit_code != STD_FAILURE)
+    {
+        uint8_t dummy_data[size];
+
+        exit_code = self->config.spi_tx_rx_callback(dummy_data, data, size, self->config.spi_timeout_ms, error);
+    }
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -129,9 +131,7 @@ int w25q32bv_flash_read_data_fast (w25q32bv_flash_t const * const self,
     assert(self != NULL);
     assert(data != NULL);
 
-    self->config.spi_select_callback();
-
-    const uint32_t address = (sector_number * self->sector_size) + sector_offset;
+    const uint32_t address = (sector_number * self->array.sector_size) + sector_offset;
 
     const uint16_t data_size = 5U;
     uint8_t tx_data[data_size], rx_data[data_size];
@@ -142,11 +142,16 @@ int w25q32bv_flash_read_data_fast (w25q32bv_flash_t const * const self,
     tx_data[3] = address & 0xFF;
     tx_data[4] = 0U;
 
-    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
+    self->config.spi_select_callback();
 
-    uint8_t dummy_data[size];
-    exit_code = self->config.spi_tx_rx_callback(dummy_data, data, size, 5000U, error);
+    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
 
+    if (exit_code != STD_FAILURE)
+    {
+        uint8_t dummy_data[size];
+
+        exit_code = self->config.spi_tx_rx_callback(dummy_data, data, size, self->config.spi_timeout_ms, error);
+    }
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -156,16 +161,16 @@ int w25q32bv_flash_enable_erasing_or_writing (w25q32bv_flash_t const * const sel
 {
     assert(self != NULL);
 
-    self->config.spi_select_callback();
-
     const uint16_t data_size = 1U;
     uint8_t tx_data[data_size], rx_data[data_size];
 
     tx_data[0] = WRITE_ENABLE;
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
 
-    self->config.delay_callback(1U);
+    const uint32_t delay_ms = 1U;
 
+    self->config.spi_select_callback();
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
+    self->config.delay_callback(delay_ms);
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -175,9 +180,7 @@ int w25q32bv_flash_erase_sector (w25q32bv_flash_t const * const self, uint32_t s
 {
     assert(self != NULL);
 
-    self->config.spi_select_callback();
-
-    const uint32_t address = sector_number * self->sector_size;
+    const uint32_t address = sector_number * self->array.sector_size;
 
     const uint16_t data_size = 4U;
     uint8_t tx_data[data_size], rx_data[data_size];
@@ -187,8 +190,8 @@ int w25q32bv_flash_erase_sector (w25q32bv_flash_t const * const self, uint32_t s
     tx_data[2] = (address & 0xFF00) >> 8;
     tx_data[3] = address & 0xFF;
 
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 1000U, error);
-
+    self->config.spi_select_callback();
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -198,9 +201,7 @@ int w25q32bv_flash_erase_block (w25q32bv_flash_t const * const self, uint32_t bl
 {
     assert(self != NULL);
 
-    self->config.spi_select_callback();
-
-    const uint32_t address = block_number * self->block_size;
+    const uint32_t address = block_number * self->array.block_size;
 
     const uint16_t data_size = 4U;
     uint8_t tx_data[data_size], rx_data[data_size];
@@ -210,8 +211,8 @@ int w25q32bv_flash_erase_block (w25q32bv_flash_t const * const self, uint32_t bl
     tx_data[2] = (address & 0xFF00) >> 8;
     tx_data[3] = address & 0xFF;
 
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 5000U, error);
-
+    self->config.spi_select_callback();
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -221,14 +222,13 @@ int w25q32bv_flash_erase_chip (w25q32bv_flash_t const * const self, std_error_t 
 {
     assert(self != NULL);
 
-    self->config.spi_select_callback();
-
     const uint16_t data_size = 1U;
     uint8_t tx_data[data_size], rx_data[data_size];
 
     tx_data[0] = CHIP_ERASE;
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 10000U, error);
 
+    self->config.spi_select_callback();
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -244,16 +244,14 @@ int w25q32bv_flash_write_page (w25q32bv_flash_t const * const self,
     assert(self != NULL);
     assert(data != NULL);
 
-    if (((size + page_offset) > self->page_size) || (size == 0U))
+    if (((size + page_offset) > self->array.page_size) || (size == 0U))
     {
         std_error_catch_invalid_argument(error, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
 
-    self->config.spi_select_callback();
-
-    const uint32_t address = (page_number * self->page_size) + page_offset;
+    const uint32_t address = (page_number * self->array.page_size) + page_offset;
 
     const uint16_t data_size = 4U;
     uint8_t tx_data[data_size], rx_data[data_size];
@@ -263,18 +261,16 @@ int w25q32bv_flash_write_page (w25q32bv_flash_t const * const self,
     tx_data[2] = (address & 0xFF00) >> 8;
     tx_data[3] = address & 0xFF;
 
-    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
+    self->config.spi_select_callback();
 
-    if (exit_code != STD_SUCCESS)
+    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
+
+    if (exit_code != STD_FAILURE)
     {
-        self->config.spi_unselect_callback();
+        uint8_t dummy_data[size];
 
-        return exit_code;
+        exit_code = self->config.spi_tx_rx_callback(data, dummy_data, size, self->config.spi_timeout_ms, error);
     }
-
-    uint8_t dummy_data[size];
-    exit_code = self->config.spi_tx_rx_callback(data, dummy_data, size, 3000U, error);
-
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -284,41 +280,36 @@ int w25q32bv_flash_wait_erasing_or_writing (w25q32bv_flash_t const * const self,
 {
     assert(self != NULL);
 
-    self->config.spi_select_callback();
-
     const uint16_t data_size = 1U;
     uint8_t tx_data[data_size], rx_data[data_size];
 
     tx_data[0] = READ_STATUS_REGISTER_1;
-    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
 
-    if (exit_code != STD_SUCCESS)
+    self->config.spi_select_callback();
+
+    int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
+
+    if (exit_code != STD_FAILURE)
     {
-        self->config.spi_unselect_callback();
+        const uint32_t delay_ms = 1U;
+        
+        tx_data[0] = DUMMY_BYTE;
 
-        return exit_code;
-    }
-
-    tx_data[0] = DUMMY_BYTE;
-
-    while (true)
-    {
-        exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
-
-        if (exit_code != STD_SUCCESS)
+        while (true)
         {
-            self->config.spi_unselect_callback();
+            exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
 
-            return exit_code;
-        }
+            if (exit_code != STD_SUCCESS)
+            {
+                break;
+            }
 
-        if ((rx_data[0] & 1U) == 0U)
-        {
-            break;
-        }
-        else
-        {
-            self->config.delay_callback(1U);
+            if ((rx_data[0] & 1U) == 0U)
+            {
+                break;
+            }
+
+            self->config.delay_callback(delay_ms);
         }
     }
     self->config.spi_unselect_callback();
@@ -330,14 +321,13 @@ int w25q32bv_flash_power_down (w25q32bv_flash_t const * const self, std_error_t 
 {
     assert(self != NULL);
 
-    self->config.spi_select_callback();
-
     const uint16_t data_size = 1U;
     uint8_t tx_data[data_size], rx_data[data_size];
 
     tx_data[0] = POWER_DOWN;
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
 
+    self->config.spi_select_callback();
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
     self->config.spi_unselect_callback();
 
     return exit_code;
@@ -346,15 +336,14 @@ int w25q32bv_flash_power_down (w25q32bv_flash_t const * const self, std_error_t 
 int w25q32bv_flash_release_power_down (w25q32bv_flash_t const * const self, std_error_t * const error)
 {
     assert(self != NULL);
-    
-    self->config.spi_select_callback();
 
     const uint16_t data_size = 1U;
     uint8_t tx_data[data_size], rx_data[data_size];
 
     tx_data[0] = RELEASE_POWER_DOWN;
-    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, 500U, error);
 
+    self->config.spi_select_callback();
+    const int exit_code = self->config.spi_tx_rx_callback(tx_data, rx_data, data_size, self->config.spi_timeout_ms, error);
     self->config.spi_unselect_callback();
 
     return exit_code;

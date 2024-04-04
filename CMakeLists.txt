@@ -22,7 +22,7 @@ set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 configure_file(src/version.h.in version.h @ONLY)
 
-enable_language(CXX)
+enable_language(ASM)
 enable_language(C)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -107,7 +107,7 @@ FetchContent_Declare(
     little_fs
     SOURCE_DIR      ${PROJECT_SOURCE_DIR}/external/little_fs
     GIT_REPOSITORY  https://github.com/littlefs-project/littlefs.git
-    GIT_TAG         v2.8.2
+    GIT_TAG         v2.9.1
 )
 FetchContent_GetProperties(little_fs)
 if(NOT little_fs_POPULATED)
@@ -192,6 +192,8 @@ target_sources(blackpill_bootloader
     INTERFACE
         src/devices/w25q32bv_flash.h
         src/devices/w25q32bv_flash.c
+        src/storage.h
+        src/storage.c
         src/board.uart_2.h
         src/board.uart_2.c
         src/logger.h
@@ -199,6 +201,7 @@ target_sources(blackpill_bootloader
 
         src/lfs_config.h
         src/lfs_config.c
+
         src/stm32f4xx_hal_conf.h
         src/stm32f4xx_hal_debug.c
         src/stm32f4xx_hal_msp.c
@@ -272,6 +275,7 @@ target_link_libraries(blackpill_firmware INTERFACE vs1838_control)
 target_link_libraries(blackpill_firmware INTERFACE bmp280_sensor)
 target_include_directories(blackpill_firmware
     INTERFACE
+        ${CMAKE_CURRENT_BINARY_DIR}
         external/free_rtos/include
         external/free_rtos/portable/GCC/ARM_CM4F
         external/w5500_driver/Ethernet

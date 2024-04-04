@@ -10,9 +10,10 @@
 #include <stdbool.h>
 
 #include "board.type.h"
+#include "node.type.h"
 
 typedef struct mcp23017_expander mcp23017_expander_t;
-typedef struct w25q32bv_flash w25q32bv_flash_t;
+typedef struct storage storage_t;
 typedef struct node_msg node_msg_t;
 typedef struct std_error std_error_t;
 
@@ -22,7 +23,7 @@ typedef int (*board_T01_send_node_msg_callback_t) (node_msg_t const * const send
 typedef struct board_T01_config
 {
     mcp23017_expander_t *mcp23017_expander;
-    w25q32bv_flash_t *w25q32bv_flash;
+    storage_t *storage;
 
     board_T01_update_status_led_callback_t update_status_led_callback;
     board_T01_send_node_msg_callback_t send_node_msg_callback;
@@ -31,9 +32,12 @@ typedef struct board_T01_config
 
 int board_T01_init (board_T01_config_t const * const init_config, std_error_t * const error);
 
+void board_T01_get_id (node_id_t * const id);
+void board_T01_is_remote_control_enabled (bool * const is_remote_control_enabled);
+
+void board_T01_is_lightning_on (bool * const is_lightning_on);
 void board_T01_process_remote_button (board_remote_button_t remote_button);
 void board_T01_process_photoresistor_data (photoresistor_data_t const * const data, uint32_t * const next_time_ms);
-void board_T01_get_lightning_status (bool * const is_lightning_on);
-void board_T01_process_rcv_node_msg (node_msg_t const * const rcv_msg);
+void board_T01_process_node_msg (node_msg_t const * const rcv_msg);
 
 #endif // BOARD_T01_H

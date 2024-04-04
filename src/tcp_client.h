@@ -33,6 +33,7 @@ typedef struct tcp_client_config
     tcp_client_spi_select_callback_t spi_unselect_callback;
     tcp_client_spi_tx_rx_callback_t spi_read_callback;
     tcp_client_spi_tx_rx_callback_t spi_write_callback;
+    uint32_t spi_timeout_ms;
 
 } tcp_client_config_t;
 

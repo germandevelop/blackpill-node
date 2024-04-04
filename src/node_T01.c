@@ -40,10 +40,21 @@ void node_T01_init (node_T01_t * const self)
     self->display_start_time_ms     = 0U;
     self->intrusion_start_time_ms   = 0U;
 
-    self->humidity.is_valid = false;
-    self->is_door_open      = false;
+    self->humidity.is_valid     = false;
+    self->is_door_open          = false;
+    self->is_warning_enabled    = true;
 
     self->send_msg_buffer_size = 0U;
+
+    return;
+}
+
+void node_T01_get_id (node_T01_t const * const self, node_id_t * const id)
+{
+    assert(self != NULL);
+    assert(id   != NULL);
+
+    *id = self->id;
 
     return;
 }
@@ -166,20 +177,23 @@ void node_T01_update_state (node_T01_t * const self,
 
         self->state.is_warning_led_on = false;
 
-        if (self->humidity.is_valid == true)
+        if (self->is_warning_enabled == true)
         {
-            if (self->is_door_open == true)
+            if (self->humidity.is_valid == true)
             {
-                if (self->humidity.temperature_C < NODE_T01_LOW_TEMPERATURE_C)  // Without hysteresis for now
+                if (self->is_door_open == true)
                 {
-                    self->state.is_warning_led_on = true;
+                    if (self->humidity.temperature_C < NODE_T01_LOW_TEMPERATURE_C)  // Without hysteresis for now
+                    {
+                        self->state.is_warning_led_on = true;
+                    }
                 }
-            }
-            else
-            {
-                if (self->humidity.temperature_C > NODE_T01_HIGH_TEMPERATURE_C) // Without hysteresis for now
+                else
                 {
-                    self->state.is_warning_led_on = true;
+                    if (self->humidity.temperature_C > NODE_T01_HIGH_TEMPERATURE_C) // Without hysteresis for now
+                    {
+                        self->state.is_warning_led_on = true;
+                    }
                 }
             }
         }
@@ -395,9 +409,9 @@ void node_T01_process_front_movement (  node_T01_t * const self,
     return;
 }
 
-void node_T01_process_rcv_msg ( node_T01_t * const self,
-                                node_msg_t const * const rcv_msg,
-                                uint32_t time_ms)
+void node_T01_process_msg (node_T01_t * const self,
+                            node_msg_t const * const rcv_msg,
+                            uint32_t time_ms)
 {
     assert(self     != NULL);
     assert(rcv_msg  != NULL);
@@ -447,7 +461,7 @@ void node_T01_process_rcv_msg ( node_T01_t * const self,
                 self->light_start_time_ms       = time_ms;
             }
         }
-        else
+        else if (intrusion_id == INTRUSION_OFF)
         {
             self->intrusion_start_time_ms = 0U;
         }
@@ -464,9 +478,23 @@ void node_T01_process_rcv_msg ( node_T01_t * const self,
                 self->light_start_time_ms = time_ms;
             }
         }
-        else
+        else if (light_id == LIGHT_OFF)
         {
             self->light_start_time_ms = 0U;
+        }
+    }
+
+    else if (rcv_msg->cmd_id == SET_WARNING)
+    {
+        const node_warning_id_t warning_id = (node_warning_id_t)(rcv_msg->value_0);
+
+        if (warning_id == WARNING_OFF)
+        {
+            self->is_warning_enabled = false;
+        }
+        else if (warning_id == WARNING_ON)
+        {
+            self->is_warning_enabled = true;
         }
     }
 

@@ -19,6 +19,8 @@ typedef struct w25q32bv_flash_config
     w25q32bv_flash_spi_select_callback_t spi_select_callback;
     w25q32bv_flash_spi_select_callback_t spi_unselect_callback;
     w25q32bv_flash_spi_tx_rx_callback_t spi_tx_rx_callback;
+    uint32_t spi_timeout_ms;
+
     w25q32bv_flash_delay_callback_t delay_callback;
 
 } w25q32bv_flash_config_t;
@@ -30,10 +32,8 @@ typedef struct w25q32bv_flash_info
 
 } w25q32bv_flash_info_t;
 
-typedef struct w25q32bv_flash
+typedef struct w25q32bv_flash_array
 {
-    w25q32bv_flash_config_t config;
-
     uint32_t page_size;
     uint32_t page_count;
     uint32_t sector_size;
@@ -41,35 +41,38 @@ typedef struct w25q32bv_flash
     uint32_t block_size;
     uint32_t block_count;
 
-} w25q32bv_flash_t;
+} w25q32bv_flash_array_t;
 
-void w25q32bv_flash_init (w25q32bv_flash_t * const self,
+typedef struct w25q32bv_flash w25q32bv_flash_t;
+
+void w25q32bv_flash_init (  w25q32bv_flash_t * const self,
                             w25q32bv_flash_config_t const * const config);
 
-void w25q32bv_flash_set_config (w25q32bv_flash_t * const self,
-                                w25q32bv_flash_config_t const * const config);
+void w25q32bv_flash_get_array ( w25q32bv_flash_t const * const self,
+                                w25q32bv_flash_array_t * const array);
 
-int w25q32bv_flash_read_info (w25q32bv_flash_t const * const self,
+int w25q32bv_flash_read_info (  w25q32bv_flash_t const * const self,
                                 w25q32bv_flash_info_t * const info,
                                 std_error_t * const error);
 
-int w25q32bv_flash_read_data (w25q32bv_flash_t const * const self,
+int w25q32bv_flash_read_data (  w25q32bv_flash_t const * const self,
                                 uint8_t *data,
                                 uint32_t size,
                                 uint32_t sector_number,
                                 uint32_t sector_offset,
                                 std_error_t * const error);
 
-int w25q32bv_flash_read_data_fast (w25q32bv_flash_t const * const self,
+int w25q32bv_flash_read_data_fast ( w25q32bv_flash_t const * const self,
                                     uint8_t *data,
                                     uint32_t size,
                                     uint32_t sector_number,
                                     uint32_t sector_offset,
                                     std_error_t * const error);
 
-int w25q32bv_flash_enable_erasing_or_writing (w25q32bv_flash_t const * const self, std_error_t * const error);
+int w25q32bv_flash_enable_erasing_or_writing (  w25q32bv_flash_t const * const self,
+                                                std_error_t * const error);
 
-int w25q32bv_flash_write_page (w25q32bv_flash_t const * const self,
+int w25q32bv_flash_write_page ( w25q32bv_flash_t const * const self,
                                 uint8_t *data,
                                 uint32_t size,
                                 uint32_t page_number,
@@ -84,5 +87,16 @@ int w25q32bv_flash_wait_erasing_or_writing (w25q32bv_flash_t const * const self,
 
 int w25q32bv_flash_power_down (w25q32bv_flash_t const * const self, std_error_t * const error);
 int w25q32bv_flash_release_power_down (w25q32bv_flash_t const * const self, std_error_t * const error);
+
+
+
+// Private
+typedef struct w25q32bv_flash
+{
+    w25q32bv_flash_config_t config;
+
+    w25q32bv_flash_array_t array;
+
+} w25q32bv_flash_t;
 
 #endif // W25Q32BV_FLASH_H

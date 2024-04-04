@@ -5,6 +5,7 @@
 
 #include "board_T01.h"
 
+#include <string.h>
 #include <limits.h>
 #include <math.h>
 #include <assert.h>
@@ -14,12 +15,9 @@
 #include "semphr.h"
 #include "timers.h"
 
-#include "lfs.h"
-
 #include "board.i2c_1.h"
 
 #include "devices/mcp23017_expander.h"
-#include "devices/w25q32bv_flash.h"
 #include "devices/bme280_sensor.h"
 #include "devices/ssd1306_display.h"
 
@@ -38,8 +36,8 @@
 #define DEFAULT_ERROR_TEXT  "Board T01 error"
 #define MALLOC_ERROR_TEXT   "Board T01 memory allocation error"
 
-#define FRONT_PIR_NOTIFICATION          (1 << 1)
-#define UPDATE_STATE_NOTIFICATION       (1 << 2)
+#define FRONT_PIR_NOTIFICATION          (1 << 0)
+#define UPDATE_STATE_NOTIFICATION       (1 << 1)
 
 #define I2C_TIMEOUT_MS          (1U * 1000U) // 1 sec
 #define PIR_HYSTERESIS_MS       (1U * 1000U) // 1 sec
@@ -60,6 +58,7 @@ static TimerHandle_t warning_led_timer;
 static board_T01_config_t config;
 
 static node_T01_t *node;
+
 
 static int board_T01_malloc (std_error_t * const error);
 static void board_T01_task (void *parameters);
@@ -86,13 +85,27 @@ int board_T01_init (board_T01_config_t const * const init_config, std_error_t * 
 {
     assert(init_config                              != NULL);
     assert(init_config->mcp23017_expander           != NULL);
-    assert(init_config->w25q32bv_flash              != NULL);
+    assert(init_config->storage                     != NULL);
     assert(init_config->update_status_led_callback  != NULL);
     assert(init_config->send_node_msg_callback      != NULL);
 
     config = *init_config;
 
     return board_T01_malloc(error);
+}
+
+void board_T01_get_id (node_id_t * const id)
+{
+    node_T01_get_id(node, id);
+
+    return;
+}
+
+void board_T01_is_remote_control_enabled (bool * const is_remote_control_enabled)
+{
+    *is_remote_control_enabled = false;
+
+    return;
 }
 
 void board_T01_task (void *parameters)
@@ -258,7 +271,7 @@ void board_T01_process_photoresistor_data (photoresistor_data_t const * const da
     return;
 }
 
-void board_T01_get_lightning_status (bool * const is_lightning_on)
+void board_T01_is_lightning_on (bool * const is_lightning_on)
 {
     assert(is_lightning_on != NULL);
 
@@ -284,14 +297,14 @@ void board_T01_get_lightning_status (bool * const is_lightning_on)
     return;
 }
 
-void board_T01_process_rcv_node_msg (node_msg_t const * const rcv_msg)
+void board_T01_process_node_msg (node_msg_t const * const rcv_msg)
 {
     assert(rcv_msg != NULL);
 
     const uint32_t tick_count_ms = xTaskGetTickCount();
 
     xSemaphoreTake(node_mutex, portMAX_DELAY);
-    node_T01_process_rcv_msg(node, rcv_msg, tick_count_ms);
+    node_T01_process_msg(node, rcv_msg, tick_count_ms);
     xSemaphoreGive(node_mutex);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
