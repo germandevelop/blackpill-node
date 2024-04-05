@@ -25,13 +25,15 @@
 #define RTOS_TASK_PRIORITY      3U              // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "tcp_client"    // 16 - max length
 
+#define SOCKET_INTERRUPT_NOTIFICATION   (1 << 0)
+#define SEND_MESSAGE_NOTIFICATION       (1 << 1)
+
+#define RECONNECTION_TIMEOUT_S 10U
+
 #define W5500_SOCKET_NUMBER 0U
 
 #define DEFAULT_ERROR_TEXT  "TCP-Client error"
 #define MALLOC_ERROR_TEXT   "TCP-Client memory allocation error"
-
-#define SOCKET_INTERRUPT_NOTIFICATION   (1 << 0)
-#define SEND_MESSAGE_NOTIFICATION       (1 << 1)
 
 #define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
@@ -126,7 +128,7 @@ void tcp_client_task (void *parameters)
     {
         if (tcp_client_setup_w5500(&error) != STD_SUCCESS)
         {
-            LOG("TCP-Client: %s\r\n", error.text);
+            LOG("TCP-Client : %s\r\n", error.text);
 
             vTaskDelay(5U * 1000U);
         }
@@ -148,7 +150,7 @@ void tcp_client_task (void *parameters)
 
         if ((notification & SEND_MESSAGE_NOTIFICATION) != 0U)
         {
-            LOG("TCP-Client: try to send message\r\n");
+            LOG("TCP-Client : try to send message\r\n");
 
             xSemaphoreTake(send_mutex, portMAX_DELAY);
 
@@ -159,7 +161,7 @@ void tcp_client_task (void *parameters)
 
             if (exit_code < SOCK_OK)
             {
-                LOG("TCP-Client: message sending is failed %li\r\n", exit_code);
+                LOG("TCP-Client : message sending is failed %li\r\n", exit_code);
             }
         }
 
@@ -171,11 +173,11 @@ void tcp_client_task (void *parameters)
             uint8_t clear_interrupt = (uint8_t)(SIK_RECEIVED | SIK_DISCONNECTED);
             ctlsocket(W5500_SOCKET_NUMBER, CS_CLR_INTERRUPT, (void*)(&clear_interrupt));
 
-            LOG("TCP-Client: ISR - %u\r\n", interrupt_kind);
+            LOG("TCP-Client : ISR - %u\r\n", interrupt_kind);
 
             if ((interrupt_kind & (uint8_t)(SIK_RECEIVED)) != 0U)
             {
-                LOG("TCP-Client: ISR - SIK_RECEIVED\r\n");
+                LOG("TCP-Client : ISR - SIK_RECEIVED\r\n");
 
                 tcp_msg_t recv_msg = { .data = { '\0' }, .size = 0U };
 
@@ -183,24 +185,22 @@ void tcp_client_task (void *parameters)
 
                 if (msg_size > 0)
                 {
-                    LOG("TCP-Client: input message - \'%s\'\r\n", recv_msg.data);
-
                     recv_msg.size = (size_t)msg_size;
 
                     if (config.process_msg_callback(&recv_msg, &error) != STD_SUCCESS)
                     {
-                        LOG("TCP-Client: %s\r\n", error.text);
+                        LOG("TCP-Client : %s\r\n", error.text);
                     }
                 }
                 else
                 {
-                    LOG("TCP-Client: input message error\r\n");
+                    LOG("TCP-Client : input message error\r\n");
                 }
             }
 
             if ((interrupt_kind & (uint8_t)(SIK_DISCONNECTED)) != 0U)
             {
-                LOG("TCP-Client: ISR - SIK_DISCONNECTED\r\n");
+                LOG("TCP-Client : ISR - SIK_DISCONNECTED\r\n");
 
                 is_connected = false;
 
@@ -223,13 +223,13 @@ void tcp_client_task (void *parameters)
             {
                 if (tcp_client_connect(&error) != STD_SUCCESS)
                 {
-                    LOG("TCP-Client: Connection fail\r\n");
+                    LOG("TCP-Client : Connection fail\r\n");
 
-                    vTaskDelay(10U * 1000U);
+                    vTaskDelay(RECONNECTION_TIMEOUT_S * 1000U);
                 }
                 else
                 {
-                    LOG("TCP-Client: Connection STD_SUCCESS\r\n");
+                    LOG("TCP-Client : Connection success\r\n");
 
                     is_connected = true;
 
@@ -280,7 +280,6 @@ int tcp_client_connect (std_error_t * const error)
     }
 
     TCP_DEBUG("try to connect");
-
 
     exit_code = connect(W5500_SOCKET_NUMBER, config.server_ip, config.server_port);
 

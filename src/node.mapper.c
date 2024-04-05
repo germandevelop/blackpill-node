@@ -38,23 +38,23 @@ void node_mapper_serialize_message (node_msg_t const * const msg, char *raw_data
 
     if ((msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION))
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"value_id\":%ld}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"value_id\":%ld}}\n", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
     }
     else if (msg->cmd_id == UPDATE_HUMIDITY)
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%ld,\"hum_pct\":%ld,\"temp_c\":%.1f}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_1, msg->value_2);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%ld,\"hum_pct\":%ld,\"temp_c\":%.1f}}\n", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_1, msg->value_2);
     }
     else if (msg->cmd_id == UPDATE_TEMPERATURE)
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%ld,\"temp_c\":%.1f}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_2);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"pres_hpa\":%ld,\"temp_c\":%.1f}}\n", msg->header.source, dest_array, msg->cmd_id, msg->value_0, msg->value_2);
     }
     else if (msg->cmd_id == UPDATE_DOOR_STATE)
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"door_state\":%ld}}", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"door_state\":%ld}}\n", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
     }
     else
     {
-        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d}", msg->header.source, dest_array, DO_NOTHING);
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d}\n", msg->header.source, dest_array, DO_NOTHING);
     }
 
     *raw_data_size = 0U;

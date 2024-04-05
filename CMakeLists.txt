@@ -271,6 +271,7 @@ target_sources(blackpill_under_testing
 add_library(blackpill_firmware INTERFACE)
 target_link_libraries(blackpill_firmware INTERFACE blackpill_bootloader)
 target_link_libraries(blackpill_firmware INTERFACE blackpill_under_testing)
+target_link_libraries(blackpill_firmware INTERFACE node)
 target_link_libraries(blackpill_firmware INTERFACE vs1838_control)
 target_link_libraries(blackpill_firmware INTERFACE bmp280_sensor)
 target_include_directories(blackpill_firmware
@@ -297,6 +298,10 @@ target_sources(blackpill_firmware
         src/board.i2c_1.c
         src/board.adc_1.h
         src/board.adc_1.c
+        src/board.gpio_a.h
+        src/board.gpio_a.c
+        src/board.gpio_c.h
+        src/board.gpio_c.c
         src/board.exti_1.h
         src/board.exti_1.c
         src/board.exti_2.h
@@ -305,6 +310,9 @@ target_sources(blackpill_firmware
         src/board.timer_2.c
         src/board.timer_3.h
         src/board.timer_3.c
+        src/board_factory.h
+        src/board_factory.c
+        src/board_factory.type.h
         src/node.h
         src/node.c
         src/node.type.h

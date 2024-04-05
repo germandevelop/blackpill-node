@@ -43,6 +43,7 @@ int storage_init (storage_t * const self, storage_config_t const * const config,
 #define LFS_MIN_PROG_BLOCK_SIZE 16U
 #define LFS_CACHE_SIZE          512U
 #define LFS_LOOKAHEAD_SIZE      128U
+#define LFS_ERASE_CYCLES        500
 
 typedef struct storage
 {

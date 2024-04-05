@@ -33,15 +33,15 @@
 
 #define RTOS_TIMER_TICKS_TO_WAIT    (1U * 1000U)
 
-#define DEFAULT_ERROR_TEXT  "Board T01 error"
-#define MALLOC_ERROR_TEXT   "Board T01 memory allocation error"
-
 #define FRONT_PIR_NOTIFICATION          (1 << 0)
 #define UPDATE_STATE_NOTIFICATION       (1 << 1)
 
 #define I2C_TIMEOUT_MS          (1U * 1000U) // 1 sec
 #define PIR_HYSTERESIS_MS       (1U * 1000U) // 1 sec
 #define WARNING_LED_PERIOD_MS   (2U * 1000U) // 2 sec
+
+#define DEFAULT_ERROR_TEXT  "Board T01 error"
+#define MALLOC_ERROR_TEXT   "Board T01 memory allocation error"
 
 #define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
@@ -55,7 +55,7 @@ static TimerHandle_t light_timer;
 static TimerHandle_t display_timer;
 static TimerHandle_t warning_led_timer;
 
-static board_T01_config_t config;
+static board_extension_config_t config;
 
 static node_T01_t *node;
 
@@ -81,7 +81,7 @@ static void board_T01_draw_yellow_display (node_T01_humidity_t const * const dat
 static void board_T01_enable_warning_led_power ();
 static void board_T01_disable_warning_led_power ();
 
-int board_T01_init (board_T01_config_t const * const init_config, std_error_t * const error)
+int board_T01_init (board_extension_config_t const * const init_config, std_error_t * const error)
 {
     assert(init_config                              != NULL);
     assert(init_config->mcp23017_expander           != NULL);
@@ -92,13 +92,6 @@ int board_T01_init (board_T01_config_t const * const init_config, std_error_t * 
     config = *init_config;
 
     return board_T01_malloc(error);
-}
-
-void board_T01_get_id (node_id_t * const id)
-{
-    node_T01_get_id(node, id);
-
-    return;
 }
 
 void board_T01_is_remote_control_enabled (bool * const is_remote_control_enabled)
@@ -256,7 +249,7 @@ void board_T01_process_photoresistor_data (photoresistor_data_t const * const da
 
     const float lux = pow(10.0F, (log10(one_lux_resistance_Ohm / (float)(data->resistance_Ohm)) / gamma));  // Probably it does not work
 
-    LOG("Board T01 : photoresistor luminosity = %.2f lux\r\n", lux);
+    LOG("Board T01 [photoresistor] : luminosity = %.2f lux\r\n", lux);
 
     node_T01_luminosity_t luminosity;
     luminosity.lux      = round(lux);

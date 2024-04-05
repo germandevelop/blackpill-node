@@ -24,4 +24,7 @@ void board_timer_2_deinit ();
 int board_timer_2_start_channel_2 (std_error_t * const error);
 void board_timer_2_stop_channel_2 ();
 
+int board_timer_2_start_channel_3 (std_error_t * const error);
+void board_timer_2_stop_channel_3 ();
+
 #endif // BOARD_TIMER_2_H

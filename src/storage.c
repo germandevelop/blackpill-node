@@ -15,8 +15,6 @@
 #include "std_error/std_error.h"
 
 
-#define LFS_ERASE_CYCLES 500
-
 #define DEFAULT_ERROR_TEXT "Storage error"
 
 
@@ -179,7 +177,7 @@ int storage_lfs_block_device_prog ( const struct lfs_config *config,
     uint32_t page_number = (((uint32_t)(sector_number) * flash_array.sector_size) / flash_array.page_size) + ((uint32_t)(sector_offset) / flash_array.page_size);
     uint32_t page_offset = (uint32_t)(sector_offset) % flash_array.page_size;
 
-    uint8_t *data = (uint8_t *)raw_data;
+    uint8_t *data = (uint8_t*)raw_data;
     uint32_t data_size = (uint32_t)size;
 
     const uint32_t page_free_size = flash_array.page_size - page_offset;

@@ -112,14 +112,6 @@ int board_timer_2_init (board_timer_2_config_t const * const init_config, std_er
 
     timer_2_handler.IC_CaptureCallback = board_timer_2_ic_capture_callback;
     
-    status = HAL_TIM_IC_Start_IT(&timer_2_handler, TIM_CHANNEL_3);
-
-    if (status != HAL_OK)
-    {
-        std_error_catch_custom(error, (int)status, TIMER_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
-
-        return STD_FAILURE;
-    }
     return STD_SUCCESS;
 }
 
@@ -147,6 +139,26 @@ int board_timer_2_start_channel_2 (std_error_t * const error)
 void board_timer_2_stop_channel_2 ()
 {
     HAL_TIM_PWM_Stop(&timer_2_handler, TIM_CHANNEL_2);
+
+    return;
+}
+
+int board_timer_2_start_channel_3 (std_error_t * const error)
+{
+    const HAL_StatusTypeDef status = HAL_TIM_IC_Start_IT(&timer_2_handler, TIM_CHANNEL_3);
+
+    if (status != HAL_OK)
+    {
+        std_error_catch_custom(error, (int)status, TIMER_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+
+        return STD_FAILURE;
+    }
+    return STD_SUCCESS;
+}
+
+void board_timer_2_stop_channel_3 ()
+{
+    HAL_TIM_IC_Stop_IT(&timer_2_handler, TIM_CHANNEL_3);
 
     return;
 }

@@ -138,7 +138,7 @@ void node_task (void *parameters)
 
             if(xQueueReceive(work_tcp_msg_queue, (void*)&work_tcp_msg, 0U) == pdPASS)
             {
-                LOG("Node : input tcp message - %s\r\n", work_tcp_msg->data);
+                LOG("Node : input tcp message = %s\r\n", work_tcp_msg->data);
 
                 node_msg_t node_msg;
 
@@ -168,13 +168,13 @@ void node_task (void *parameters)
 
             if(xQueueReceive(work_msg_queue, (void*)&work_msg, 0U) == pdPASS)
             {
-                if (work_msg->header.source != config.id)
+                if (work_msg->header.source == config.id)
                 {
                     tcp_msg_t send_tcp_msg;
 
                     node_mapper_serialize_message(work_msg, send_tcp_msg.data, &send_tcp_msg.size);
 
-                    LOG("Node : output tcp message - %s\r\n", send_tcp_msg.data);
+                    LOG("Node : output tcp message = %s\r\n", send_tcp_msg.data);
 
                     config.send_tcp_msg_callback(&send_tcp_msg);
                 }
