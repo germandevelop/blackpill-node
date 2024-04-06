@@ -138,7 +138,7 @@ void node_task (void *parameters)
 
             if(xQueueReceive(work_tcp_msg_queue, (void*)&work_tcp_msg, 0U) == pdPASS)
             {
-                LOG("Node : input tcp message = %s\r\n", work_tcp_msg->data);
+                LOG("Node [tcp] : input msg = %s\r\n", work_tcp_msg->data);
 
                 node_msg_t node_msg;
 
@@ -155,7 +155,7 @@ void node_task (void *parameters)
                 }
                 else
                 {
-                    LOG("Node : %s\r\n", error.text);
+                    LOG("Node [mapper] : %s\r\n", error.text);
                 }
             }
 
@@ -174,7 +174,7 @@ void node_task (void *parameters)
 
                     node_mapper_serialize_message(work_msg, send_tcp_msg.data, &send_tcp_msg.size);
 
-                    LOG("Node : output tcp message = %s\r\n", send_tcp_msg.data);
+                    LOG("Node [tcp] : output msg = %s\r\n", send_tcp_msg.data);
 
                     config.send_tcp_msg_callback(&send_tcp_msg);
                 }

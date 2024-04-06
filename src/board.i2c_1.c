@@ -132,6 +132,7 @@ void board_i2c_1_msp_init (I2C_HandleTypeDef *i2c_handler)
     UNUSED(i2c_handler);
 
     // Peripheral clock enable
+    __HAL_RCC_I2C1_CLK_SLEEP_ENABLE();
     __HAL_RCC_I2C1_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
 

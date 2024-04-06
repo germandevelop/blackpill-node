@@ -78,7 +78,7 @@ void board_uart_2_msp_init (UART_HandleTypeDef *uart_handler)
     UNUSED(uart_handler);
     
     // Peripheral clock enable
-    //__HAL_RCC_USART2_CLK_SLEEP_ENABLE();
+    __HAL_RCC_USART2_CLK_SLEEP_ENABLE();
     __HAL_RCC_USART2_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 

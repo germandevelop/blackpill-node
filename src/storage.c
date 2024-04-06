@@ -17,6 +17,9 @@
 
 #define DEFAULT_ERROR_TEXT "Storage error"
 
+#define UNUSED(x) (void)(x)
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+
 
 static int storage_lfs_block_device_read (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, void *raw_data, lfs_size_t size);
 static int storage_lfs_block_device_prog (const struct lfs_config *config, lfs_block_t sector_number, lfs_off_t sector_offset, const void *raw_data, lfs_size_t size);
@@ -273,6 +276,10 @@ int storage_lfs_block_device_erase (const struct lfs_config *config,
 
 int storage_lfs_block_device_sync (const struct lfs_config *config)
 {
+    const storage_t *storage = (const storage_t*)config->context;
+
+    UNUSED(storage);
+
     return (int)(LFS_ERR_OK);
 }
 
@@ -293,3 +300,47 @@ int storage_lfs_block_device_unlock (const struct lfs_config *config)
 
     return (int)(LFS_ERR_OK);
 }
+
+
+
+/* NOTE: LFS using example
+
+    lfs_t lfs;
+    lfs_file_t file;
+    printf("Start\r\n");
+    int err = lfs_mount(&lfs, &cfg);
+    printf("Mount : %d\r\n", err);
+    
+    // reformat if we can't mount the filesystem
+    // this should only happen on the first boot
+    if (err)
+    {
+        printf("Format\r\n");
+        err = lfs_format(&lfs, &cfg);
+        printf("Mount: %d\r\n", err);
+        lfs_mount(&lfs, &cfg);
+    }
+
+    //lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
+    lfs_mkdir(&lfs, "config");
+    struct lfs_file_config config = { 0 };
+    config.buffer = (void*)lfs_file_buffer;
+    lfs_file_opencfg(&lfs, &file, "config/boot_count", LFS_O_RDWR | LFS_O_CREAT, &config);
+
+    uint32_t boot_count = 0;
+    lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
+
+    // update boot count
+    boot_count += 1;
+    lfs_file_rewind(&lfs, &file);
+    lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
+
+    // remember the storage is not updated until the file is closed successfully
+    lfs_file_close(&lfs, &file);
+
+    // release any resources we were using
+    printf("Umount\r\n");
+    lfs_unmount(&lfs);
+
+    printf("boot_count: %d\r\n", boot_count);
+*/

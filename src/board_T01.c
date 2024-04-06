@@ -36,9 +36,11 @@
 #define FRONT_PIR_NOTIFICATION          (1 << 0)
 #define UPDATE_STATE_NOTIFICATION       (1 << 1)
 
-#define I2C_TIMEOUT_MS          (1U * 1000U) // 1 sec
-#define PIR_HYSTERESIS_MS       (1U * 1000U) // 1 sec
-#define WARNING_LED_PERIOD_MS   (2U * 1000U) // 2 sec
+#define I2C_TIMEOUT_MS (1U * 1000U) // 1 sec
+
+#define PIR_HYSTERESIS_MS           (1U * 1000U) // 1 sec
+#define WARNING_LED_ON_PERIOD_MS    (4U * 1000U) // 4 sec
+#define WARNING_LED_OFF_PERIOD_MS   (1U * 1000U) // 1 sec
 
 #define DEFAULT_ERROR_TEXT  "Board T01 error"
 #define MALLOC_ERROR_TEXT   "Board T01 memory allocation error"
@@ -49,8 +51,10 @@
 
 static TaskHandle_t task;
 static SemaphoreHandle_t node_mutex;
+static SemaphoreHandle_t lightning_block_mutex;
 static TimerHandle_t humidity_timer;
 static TimerHandle_t reed_switch_timer;
+static TimerHandle_t lightning_block_timer;
 static TimerHandle_t light_timer;
 static TimerHandle_t display_timer;
 static TimerHandle_t warning_led_timer;
@@ -58,12 +62,14 @@ static TimerHandle_t warning_led_timer;
 static board_extension_config_t config;
 
 static node_T01_t *node;
+static bool is_lightning_blocked;
 
 
 static int board_T01_malloc (std_error_t * const error);
 static void board_T01_task (void *parameters);
 static void board_T01_humidity_timer (TimerHandle_t timer);
 static void board_T01_reed_switch_timer (TimerHandle_t timer);
+static void board_T01_lightning_block_timer (TimerHandle_t timer);
 static void board_T01_light_timer (TimerHandle_t timer);
 static void board_T01_display_timer (TimerHandle_t timer);
 static void board_T01_warning_led_timer (TimerHandle_t timer);
@@ -110,10 +116,11 @@ void board_T01_task (void *parameters)
 
     // Init node
     node_T01_init(node);
+    is_lightning_blocked = false;
 
     // Init bme280 sensor
     {
-        LOG("Board T01 : init bme280 sensor\r\n");
+        LOG("Board T01 [bme280] : init\r\n");
 
         bme280_sensor_config_t config;
         config.write_i2c_callback   = board_i2c_1_write_register;
@@ -123,7 +130,7 @@ void board_T01_task (void *parameters)
 
         if (bme280_sensor_init(&config, &error) != STD_SUCCESS)
         {
-            LOG("Board T01 : %s\r\n", error.text);
+            LOG("Board T01 [bme280] : %s\r\n", error.text);
         }
     }
 
@@ -133,12 +140,14 @@ void board_T01_task (void *parameters)
     while (true)
     {
         uint32_t notification;
-        xTaskNotifyWait(0U, ULONG_MAX, &notification, 30U * 1000U);
+        xTaskNotifyWait(0U, ULONG_MAX, &notification, portMAX_DELAY);
 
         const uint32_t tick_count_ms = xTaskGetTickCount();
 
         if ((notification & FRONT_PIR_NOTIFICATION) != 0U)
         {
+            LOG("Board T01 [pir] : movement\r\n");
+
             xSemaphoreTake(node_mutex, portMAX_DELAY);
             node_T01_process_front_movement(node, tick_count_ms);
             xSemaphoreGive(node_mutex);
@@ -148,78 +157,79 @@ void board_T01_task (void *parameters)
         {
             node_T01_state_t node_state;
 
-            // Try to send new messages
-            while (true)
-            {
-                xSemaphoreTake(node_mutex, portMAX_DELAY);
-                node_T01_get_state(node, &node_state, tick_count_ms);
-                xSemaphoreGive(node_mutex);
+            xSemaphoreTake(node_mutex, portMAX_DELAY);
+            node_T01_get_state(node, &node_state, tick_count_ms);
+            xSemaphoreGive(node_mutex);
 
-                if (node_state.is_msg_to_send == true)
+            // Send messages
+            if (node_state.is_msg_to_send == true)
+            {
+                while (true)
                 {
+                    bool is_msg_valid;
                     node_msg_t send_msg;
 
                     xSemaphoreTake(node_mutex, portMAX_DELAY);
-                    int exit_code = node_T01_get_msg(node, &send_msg, &error);
+                    node_T01_get_msg(node, &send_msg, &is_msg_valid);
                     xSemaphoreGive(node_mutex);
 
-                    if (exit_code != STD_SUCCESS)
+                    if (is_msg_valid == false)
                     {
-                        LOG("Board T01 : %s\r\n", error.text);
                         break;
                     }
 
-                    exit_code = config.send_node_msg_callback(&send_msg, &error);
-
-                    if (exit_code != STD_SUCCESS)
+                    if (config.send_node_msg_callback(&send_msg, &error) != STD_SUCCESS)
                     {
-                        LOG("Board T01 : %s\r\n", error.text);
+                        LOG("Board T01 [node] : %s\r\n", error.text);
+                    }
+                }
+            }
+
+            xSemaphoreTake(lightning_block_mutex, portMAX_DELAY);
+            const bool is_lightning_blocked_now = is_lightning_blocked;
+            xSemaphoreGive(lightning_block_mutex);
+
+            if (is_lightning_blocked_now == false)
+            {
+                // Update light state
+                if (node_state.is_light_on == true)
+                {
+                    if (xTimerIsTimerActive(light_timer) == pdFALSE)
+                    {
+                        xTimerChangePeriod(light_timer, (1U / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+                    }
+                }
+
+                // Update display state
+                if (node_state.is_display_on == true)
+                {
+                    if (xTimerIsTimerActive(display_timer) == pdFALSE)
+                    {
+                        xTimerChangePeriod(display_timer, (1U / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+                    }
+                }
+
+                // Update warning LED state
+                if (node_state.is_warning_led_on == true)
+                {
+                    if (xTimerIsTimerActive(warning_led_timer) == pdFALSE)
+                    {
+                        board_T01_enable_warning_led_power();
+                        xTimerChangePeriod(warning_led_timer, WARNING_LED_ON_PERIOD_MS / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
                     }
                 }
                 else
                 {
-                    break;
+                    if (xTimerIsTimerActive(warning_led_timer) == pdTRUE)
+                    {
+                        xTimerStop(warning_led_timer, RTOS_TIMER_TICKS_TO_WAIT);
+                        board_T01_disable_warning_led_power();
+                    }
                 }
-            }
 
-            // Update light state
-            if (node_state.is_light_on == true)
-            {
-                if (xTimerIsTimerActive(light_timer) == pdFALSE)
-                {
-                    xTimerChangePeriod(light_timer, (100U / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
-                }
+                // Update status LED color
+                config.update_status_led_callback(node_state.status_led_color);
             }
-
-            // Update display state
-            if (node_state.is_display_on == true)
-            {
-                if (xTimerIsTimerActive(display_timer) == pdFALSE)
-                {
-                    xTimerChangePeriod(display_timer, (100U / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
-                }
-            }
-
-            // Update warning LED state
-            if (node_state.is_warning_led_on == true)
-            {
-                if (xTimerIsTimerActive(warning_led_timer) == pdFALSE)
-                {
-                    board_T01_enable_warning_led_power();
-                    xTimerStart(warning_led_timer, RTOS_TIMER_TICKS_TO_WAIT);
-                }
-            }
-            else
-            {
-                if (xTimerIsTimerActive(warning_led_timer) == pdTRUE)
-                {
-                    xTimerStop(warning_led_timer, RTOS_TIMER_TICKS_TO_WAIT);
-                    board_T01_disable_warning_led_power();
-                }
-            }
-
-            // Update status LED color
-            config.update_status_led_callback(node_state.status_led_color);
         }
 
         LOG("Board T01 : loop\r\n");
@@ -264,28 +274,27 @@ void board_T01_process_photoresistor_data (photoresistor_data_t const * const da
     return;
 }
 
-void board_T01_is_lightning_on (bool * const is_lightning_on)
+void board_T01_disable_lightning (uint32_t period_ms, bool * const is_lightning_disabled)
 {
-    assert(is_lightning_on != NULL);
+    assert(period_ms                != 0U);
+    assert(is_lightning_disabled    != NULL);
 
-    const uint32_t tick_count_ms = xTaskGetTickCount();
+    xSemaphoreTake(lightning_block_mutex, portMAX_DELAY);
+    is_lightning_blocked = true;
+    xSemaphoreGive(lightning_block_mutex);
 
-    node_T01_state_t node_state;
+    *is_lightning_disabled = true;
 
-    xSemaphoreTake(node_mutex, portMAX_DELAY);
-    node_T01_get_state(node, &node_state, tick_count_ms);
-    xSemaphoreGive(node_mutex);
+    xTimerStop(light_timer, RTOS_TIMER_TICKS_TO_WAIT);
+    board_T01_disable_light_power();
 
-    *is_lightning_on = (node_state.is_light_on == true) || (node_state.is_display_on == true);
+    xTimerStop(warning_led_timer, RTOS_TIMER_TICKS_TO_WAIT);
+    board_T01_disable_warning_led_power();
 
-    if (*is_lightning_on != true)
-    {
-        if (node_state.is_warning_led_on == true)
-        {
-            xTimerStop(warning_led_timer, RTOS_TIMER_TICKS_TO_WAIT);
-            board_T01_disable_warning_led_power();
-        }
-    }
+    xTimerStop(display_timer, RTOS_TIMER_TICKS_TO_WAIT);
+    board_T01_disable_display_power();
+
+    xTimerChangePeriod(lightning_block_timer, period_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
 
     return;
 }
@@ -309,12 +318,14 @@ void board_T01_humidity_timer (TimerHandle_t timer)
 {
     UNUSED(timer);
 
-    LOG("Board T01 : read humidity sensor\r\n");
+    LOG("Board T01 [bme280] : read\r\n");
 
     std_error_t error;
     std_error_init(&error);
 
     node_T01_humidity_t humidity;
+    humidity.is_valid = false;
+    
     bme280_sensor_data_t data;
 
     if (bme280_sensor_read_data(&data, &error) != STD_FAILURE)
@@ -324,15 +335,13 @@ void board_T01_humidity_timer (TimerHandle_t timer)
         humidity.temperature_C  = data.temperature_C;
         humidity.is_valid       = true;
 
-        LOG("Board T01 : humidity = %.1f %%\r\n", data.humidity_pct);
-        LOG("Board T01 : temperature = %.2f C\r\n", data.temperature_C);
-        LOG("Board T01 : pressure = %.1f hPa\r\n", data.pressure_hPa);
+        LOG("Board T01 [bme280] : humidity = %.1f %%\r\n", data.humidity_pct);
+        LOG("Board T01 [bme280] : temperature = %.2f C\r\n", data.temperature_C);
+        LOG("Board T01 [bme280] : pressure = %.1f hPa\r\n", data.pressure_hPa);
     }
     else
     {
-        humidity.is_valid = false;
-
-        LOG("Board T01 : %s\r\n", error.text);
+        LOG("Board T01 [bme280] : %s\r\n", error.text);
     }
 
     uint32_t next_time_ms;
@@ -341,7 +350,7 @@ void board_T01_humidity_timer (TimerHandle_t timer)
     node_T01_process_humidity(node, &humidity, &next_time_ms);
     xSemaphoreGive(node_mutex);
 
-    xTimerChangePeriod(humidity_timer, next_time_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(humidity_timer, (next_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
 
@@ -352,7 +361,7 @@ void board_T01_reed_switch_timer (TimerHandle_t timer)
 {
     UNUSED(timer);
 
-    LOG("Board T01 : read reed switch\r\n");
+    LOG("Board T01 [reed_switch] : read\r\n");
 
     // **************************************
     // Read state
@@ -372,7 +381,20 @@ void board_T01_reed_switch_timer (TimerHandle_t timer)
     node_T01_process_door_state(node, is_door_open, &next_time_ms);
     xSemaphoreGive(node_mutex);
 
-    xTimerChangePeriod(reed_switch_timer, next_time_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(reed_switch_timer, (next_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+
+    xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
+
+    return;
+}
+
+void board_T01_lightning_block_timer (TimerHandle_t timer)
+{
+    UNUSED(timer);
+
+    xSemaphoreTake(lightning_block_mutex, portMAX_DELAY);
+    is_lightning_blocked = false;
+    xSemaphoreGive(lightning_block_mutex);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
 
@@ -396,7 +418,7 @@ void board_T01_light_timer (TimerHandle_t timer)
         node_T01_get_light_data(node, &disable_time_ms);
         xSemaphoreGive(node_mutex);
 
-        xTimerChangePeriod(light_timer, disable_time_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerChangePeriod(light_timer, (disable_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
     }
     else
     {
@@ -409,14 +431,14 @@ void board_T01_light_timer (TimerHandle_t timer)
 
 void board_T01_enable_light_power ()
 {
-    LOG("Board T01 : enable power for light\r\n");
+    LOG("Board T01 [light] : enable power\r\n");
 
     return;
 }
 
 void board_T01_disable_light_power ()
 {
-    LOG("Board T01 : disable power for light\r\n");
+    LOG("Board T01 [light] : disable power\r\n");
 
     return;
 }
@@ -430,12 +452,18 @@ void board_T01_warning_led_timer (TimerHandle_t timer)
     if (is_warning_led_on != true)
     {
         is_warning_led_on = true;
+
         board_T01_enable_warning_led_power();
+
+        xTimerChangePeriod(warning_led_timer, (WARNING_LED_ON_PERIOD_MS / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
     }
     else
     {
         is_warning_led_on = false;
+
         board_T01_disable_warning_led_power();
+
+        xTimerChangePeriod(warning_led_timer, (WARNING_LED_OFF_PERIOD_MS / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
     }
 
     return;
@@ -443,14 +471,14 @@ void board_T01_warning_led_timer (TimerHandle_t timer)
 
 void board_T01_enable_warning_led_power ()
 {
-    LOG("Board T01 : enable power for warning LED\r\n");
+    LOG("Board T01 [warning_led] : enable power\r\n");
 
     return;
 }
 
 void board_T01_disable_warning_led_power ()
 {
-    LOG("Board T01 : disable power for warning LED\r\n");
+    LOG("Board T01 [warning_led] : disable power\r\n");
 
     return;
 }
@@ -497,7 +525,7 @@ void board_T01_display_timer (TimerHandle_t timer)
         board_T01_draw_yellow_display(&data);
         board_T01_draw_blue_display(&data);
 
-        xTimerChangePeriod(display_timer, disable_time_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerChangePeriod(display_timer, (disable_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
     }
     else
     {
@@ -510,21 +538,21 @@ void board_T01_display_timer (TimerHandle_t timer)
 
 void board_T01_enable_display_power ()
 {
-    LOG("Board T01 : enable power for display\r\n");
+    LOG("Board T01 [display] : enable power\r\n");
 
     return;
 }
 
 void board_T01_disable_display_power ()
 {
-    LOG("Board T01 : disable power for display\r\n");
+    LOG("Board T01 [display] : disable power\r\n");
 
     return;
 }
 
 void board_T01_draw_blue_display (node_T01_humidity_t const * const data)
 {
-    LOG("Board T01 : draw blue display\r\n");
+    LOG("Board T01 [display] : draw blue\r\n");
 
     // Prepare text to draw
     const uint8_t temp_text[] = {  0xD2, 0xC5, 0xCC, 0xCF, 0xC5, 0xD0, 0xC0, 0xD2, 0xD3, 0xD0, 0xC0 };
@@ -567,22 +595,19 @@ void board_T01_draw_blue_display (node_T01_humidity_t const * const data)
     config.device_address           = SSD1306_DISPLAY_ADDRESS_2;
 
     ssd1306_display_t ssd1306_display;
-    int exit_code = ssd1306_display_init(&ssd1306_display, &config, &error);
 
-    if (exit_code != STD_SUCCESS)
+    if (ssd1306_display_init(&ssd1306_display, &config, &error) != STD_SUCCESS)
     {
-        LOG("Board T01 : init blue display = %s\r\n", error.text);
+        LOG("Board T01 [display] : blue = %s\r\n", error.text);
 
         return;
     }
 
     ssd1306_display_reset_buffer(&ssd1306_display);
 
-    exit_code = ssd1306_display_update_full_screen(&ssd1306_display, &error);
-
-    if (exit_code != STD_SUCCESS)
+    if (ssd1306_display_update_full_screen(&ssd1306_display, &error) != STD_SUCCESS)
     {
-        LOG("Board T01 : clear blue display = %s\r\n", error.text);
+        LOG("Board T01 [display] : blue = %s\r\n", error.text);
     }
 
     if (data->is_valid == true)
@@ -597,11 +622,9 @@ void board_T01_draw_blue_display (node_T01_humidity_t const * const data)
         ssd1306_display_draw_text_10x16(&ssd1306_display, (const char*)error_text, ARRAY_SIZE(error_text), x_current, y_current, &X_shift);
     }
 
-    exit_code = ssd1306_display_update_full_screen(&ssd1306_display, &error);
-
-    if (exit_code != STD_SUCCESS)
+    if (ssd1306_display_update_full_screen(&ssd1306_display, &error) != STD_SUCCESS)
     {
-        LOG("Board T01 : draw blue display = %s\r\n", error.text);
+        LOG("Board T01 [display] : blue = %s\r\n", error.text);
     }
 
     return;
@@ -613,7 +636,7 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data)
     //const uint8_t press_text[] = {  0xE4, 0xE0, 0xE2, 0xEB, 0xE5, 0xED, 0xE8, 0xE5 };
     //const uint8_t press_text[] = {  0xE3, 0xCF, 0xC0 };
 
-    LOG("Board T01 : draw yellow display\r\n");
+    LOG("Board T01 [display] : draw yellow\r\n");
 
     // Prepare text to draw
     const uint8_t error_text[] = {  0xCE, 0xF8, 0xE8, 0xE1, 0xEA, 0xE0 };
@@ -659,22 +682,19 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data)
     config.device_address           = SSD1306_DISPLAY_ADDRESS_1;
 
     ssd1306_display_t ssd1306_display;
-    int exit_code = ssd1306_display_init(&ssd1306_display, &config, &error);
 
-    if (exit_code != STD_SUCCESS)
+    if (ssd1306_display_init(&ssd1306_display, &config, &error) != STD_SUCCESS)
     {
-        LOG("Board T01 : init yellow display = %s\r\n", error.text);
+        LOG("Board T01 [display] : yellow = %s\r\n", error.text);
 
         return;
     }
 
     ssd1306_display_reset_buffer(&ssd1306_display);
 
-    exit_code = ssd1306_display_update_full_screen(&ssd1306_display, &error);
-
-    if (exit_code != STD_SUCCESS)
+    if (ssd1306_display_update_full_screen(&ssd1306_display, &error) != STD_SUCCESS)
     {
-        LOG("Board T01 : clear yellow display = %s\r\n", error.text);
+        LOG("Board T01 [display] : yellow = %s\r\n", error.text);
     }
 
     if (data->is_valid == true)
@@ -689,11 +709,9 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data)
         ssd1306_display_draw_text_10x16(&ssd1306_display, (const char*)error_text, ARRAY_SIZE(error_text), x_current, y_current, &X_shift);
     }
 
-    exit_code = ssd1306_display_update_full_screen(&ssd1306_display, &error);
-
-    if (exit_code != STD_SUCCESS)
+    if (ssd1306_display_update_full_screen(&ssd1306_display, &error) != STD_SUCCESS)
     {
-        LOG("Board T01 : draw yellow display = %s\r\n", error.text);
+        LOG("Board T01 [display] : yellow = %s\r\n", error.text);
     }
 
     return;
@@ -706,26 +724,32 @@ int board_T01_malloc (std_error_t * const error)
 
     const bool are_buffers_allocated = (node != NULL);
 
-    node_mutex = xSemaphoreCreateMutex();
+    node_mutex              = xSemaphoreCreateMutex();
+    lightning_block_mutex   = xSemaphoreCreateMutex();
 
-    const bool are_semaphores_allocated = (node_mutex != NULL);
+    const bool are_semaphores_allocated = (node_mutex != NULL) && (lightning_block_mutex != NULL);
 
-    humidity_timer      = xTimerCreate("humidity", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_humidity_timer);
-    reed_switch_timer   = xTimerCreate("reed_switch", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_reed_switch_timer);
-    display_timer       = xTimerCreate("display", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_display_timer);
-    light_timer         = xTimerCreate("light", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_light_timer);
-    warning_led_timer   = xTimerCreate("warning_led", (WARNING_LED_PERIOD_MS / portTICK_PERIOD_MS), pdTRUE, NULL, board_T01_warning_led_timer);
+    humidity_timer          = xTimerCreate("humidity", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_humidity_timer);
+    reed_switch_timer       = xTimerCreate("reed_switch", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_reed_switch_timer);
+    lightning_block_timer   = xTimerCreate("lightning_block", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_lightning_block_timer);
+    light_timer             = xTimerCreate("light", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_light_timer);
+    display_timer           = xTimerCreate("display", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_display_timer);
+    warning_led_timer       = xTimerCreate("warning_led", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_warning_led_timer);
 
-    const bool are_timers_allocated = (humidity_timer != NULL) && (reed_switch_timer != NULL) && (display_timer != NULL) && (warning_led_timer != NULL);
+    const bool are_timers_allocated = (humidity_timer != NULL) && (reed_switch_timer != NULL) &&
+                                        (lightning_block_timer != NULL) && (light_timer != NULL) &&
+                                        (display_timer != NULL) && (warning_led_timer != NULL);
 
     if ((are_buffers_allocated != true) || (are_semaphores_allocated != true) || (are_timers_allocated != true))
     {
         vPortFree((void*)node);
         vSemaphoreDelete(node_mutex);
+        vSemaphoreDelete(lightning_block_mutex);
         xTimerDelete(humidity_timer, RTOS_TIMER_TICKS_TO_WAIT);
         xTimerDelete(reed_switch_timer, RTOS_TIMER_TICKS_TO_WAIT);
-        xTimerDelete(display_timer, RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerDelete(lightning_block_timer, RTOS_TIMER_TICKS_TO_WAIT);
         xTimerDelete(light_timer, RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerDelete(display_timer, RTOS_TIMER_TICKS_TO_WAIT);
         xTimerDelete(warning_led_timer, RTOS_TIMER_TICKS_TO_WAIT);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);
@@ -743,47 +767,3 @@ int board_T01_malloc (std_error_t * const error)
     }
     return STD_SUCCESS;
 }
-
-
-
-/* NOTE: LFS using example
-
-    lfs_t lfs;
-    lfs_file_t file;
-    printf("Start\r\n");
-    int err = lfs_mount(&lfs, &cfg);
-    printf("Mount : %d\r\n", err);
-    
-    // reformat if we can't mount the filesystem
-    // this should only happen on the first boot
-    if (err)
-    {
-        printf("Format\r\n");
-        err = lfs_format(&lfs, &cfg);
-        printf("Mount: %d\r\n", err);
-        lfs_mount(&lfs, &cfg);
-    }
-
-    //lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
-    lfs_mkdir(&lfs, "config");
-    struct lfs_file_config config = { 0 };
-    config.buffer = (void*)lfs_file_buffer;
-    lfs_file_opencfg(&lfs, &file, "config/boot_count", LFS_O_RDWR | LFS_O_CREAT, &config);
-
-    uint32_t boot_count = 0;
-    lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-
-    // update boot count
-    boot_count += 1;
-    lfs_file_rewind(&lfs, &file);
-    lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
-
-    // remember the storage is not updated until the file is closed successfully
-    lfs_file_close(&lfs, &file);
-
-    // release any resources we were using
-    printf("Umount\r\n");
-    lfs_unmount(&lfs);
-
-    printf("boot_count: %d\r\n", boot_count);
-*/

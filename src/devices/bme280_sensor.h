@@ -15,11 +15,11 @@ typedef void (*bme280_sensor_delay_callback_t) (uint32_t delay_ms);
 
 typedef struct bme280_sensor_config
 {
-    bme280_sensor_i2c_callback_t    read_i2c_callback;
-    bme280_sensor_i2c_callback_t    write_i2c_callback;
+    bme280_sensor_i2c_callback_t read_i2c_callback;
+    bme280_sensor_i2c_callback_t write_i2c_callback;
     uint32_t i2c_timeout_ms;
     
-    bme280_sensor_delay_callback_t  delay_callback;
+    bme280_sensor_delay_callback_t delay_callback;
 
 } bme280_sensor_config_t;
 

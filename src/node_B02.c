@@ -8,12 +8,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "std_error/std_error.h"
-
-
-#define DEFAULT_ERROR_TEXT  "Node B02 error"
-#define MESSAGE_ERROR_TEXT  "Node B02 message error"
-
 #define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
@@ -429,9 +423,9 @@ void node_B02_process_veranda_movement (node_B02_t * const self,
     return;
 }
 
-void node_B02_process_rcv_msg ( node_B02_t * const self,
-                                node_msg_t const * const rcv_msg,
-                                uint32_t time_ms)
+void node_B02_process_msg ( node_B02_t * const self,
+                            node_msg_t const * const rcv_msg,
+                            uint32_t time_ms)
 {
     assert(self     != NULL);
     assert(rcv_msg  != NULL);
@@ -533,19 +527,21 @@ void node_B02_get_display_data (node_B02_t const * const self,
     return;
 }
 
-int node_B02_get_msg (  node_B02_t * const self,
+void node_B02_get_msg ( node_B02_t * const self,
                         node_msg_t *msg,
-                        std_error_t * const error)
+                        bool * const is_msg_valid)
 {
-    if (self->send_msg_buffer_size == 0U)
-    {
-        std_error_catch_custom(error, STD_FAILURE, MESSAGE_ERROR_TEXT, __FILE__, __LINE__);
+    *is_msg_valid = false;
 
-        return STD_FAILURE;
+    if (self->send_msg_buffer_size != 0U)
+    {
+        *is_msg_valid = true;
+
+        const size_t i = self->send_msg_buffer_size - 1U;
+
+        memcpy((void*)(msg), (const void*)(&self->send_msg_buffer[i]), sizeof(node_msg_t));
+        --self->send_msg_buffer_size;
     }
 
-    --self->send_msg_buffer_size;
-    memcpy((void*)(msg), (const void*)(&self->send_msg_buffer[self->send_msg_buffer_size]), sizeof(node_msg_t));
-
-    return STD_SUCCESS;
+    return;
 }

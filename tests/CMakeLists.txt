@@ -26,7 +26,7 @@ target_sources(tests
 target_compile_options(tests
     PRIVATE
         -Wno-missing-field-initializers
-        -Wno-c99-designator
+        #-Wno-c99-designator
 )
 target_compile_features(tests
     PRIVATE
@@ -41,7 +41,8 @@ target_link_libraries(tests
     PRIVATE
         GTest::gmock
         GTest::gmock_main
-        blackpill_under_testing
+        blackpill_config
+        blackpill_testing
 )
 
 

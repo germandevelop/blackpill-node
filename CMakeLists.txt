@@ -22,8 +22,8 @@ set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 configure_file(src/version.h.in version.h @ONLY)
 
-enable_language(ASM)
 enable_language(C)
+enable_language(ASM)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -104,6 +104,17 @@ if(NOT w5500_driver_POPULATED)
 endif()
 
 FetchContent_Declare(
+    lwjson_parser
+    SOURCE_DIR      ${PROJECT_SOURCE_DIR}/external/lwjson_parser
+    GIT_REPOSITORY  https://github.com/MaJerle/lwjson.git
+    GIT_TAG         v1.6.1
+)
+FetchContent_GetProperties(lwjson_parser)
+if(NOT lwjson_parser_POPULATED)
+    FetchContent_Populate(lwjson_parser)
+endif()
+
+FetchContent_Declare(
     little_fs
     SOURCE_DIR      ${PROJECT_SOURCE_DIR}/external/little_fs
     GIT_REPOSITORY  https://github.com/littlefs-project/littlefs.git
@@ -136,24 +147,9 @@ if(NOT bmp280_driver_POPULATED)
     FetchContent_Populate(bmp280_driver)
 endif()
 
-FetchContent_Declare(
-    lwjson_parser
-    SOURCE_DIR      ${PROJECT_SOURCE_DIR}/external/lwjson_parser
-    GIT_REPOSITORY  https://github.com/MaJerle/lwjson.git
-    GIT_TAG         v1.6.1
-)
-FetchContent_GetProperties(lwjson_parser)
-if(NOT lwjson_parser_POPULATED)
-    FetchContent_Populate(lwjson_parser)
-endif()
 
-
-
+# Create blackpill config target
 add_library(blackpill_config INTERFACE)
-target_include_directories(blackpill_config
-    INTERFACE
-        src
-)
 target_compile_features(blackpill_config
     INTERFACE
         c_std_17
@@ -175,14 +171,63 @@ target_compile_options(blackpill_config
 )
 
 
+# Create blackpill under testing target
+add_library(blackpill_testing INTERFACE)
+target_include_directories(blackpill_testing
+    INTERFACE
+        src
+)
+target_sources(blackpill_testing
+    INTERFACE
+        src/devices/mcp23017_expander.h
+        src/devices/mcp23017_expander.c
+        src/node_T01.h
+        src/node_T01.c
+        src/node_B02.h
+        src/node_B02.c
+)
+
 add_subdirectory(external/common_code)
+target_link_libraries(blackpill_testing INTERFACE node)
+
+
+# Create general blackpill common target
+add_library(blackpill_common INTERFACE)
+target_link_libraries(blackpill_common INTERFACE blackpill_config)
+target_compile_options(blackpill_common
+    INTERFACE
+        -mcpu=cortex-m4
+        -mthumb
+        -mfpu=fpv4-sp-d16
+        -mfloat-abi=hard
+        -fdata-sections
+        -ffunction-sections
+)
+target_link_options(blackpill_common
+    INTERFACE
+        -mcpu=cortex-m4
+        -mthumb
+        -mfpu=fpv4-sp-d16
+        -mfloat-abi=hard
+        -specs=nano.specs
+        -specs=nosys.specs
+        -u _printf_float
+        -lc
+        -lm
+        #-lnosys
+        -Wl,-Map=${PROJECT_NAME}.map,--cref
+        -Wl,--gc-sections
+        -Wl,--print-memory-usage
+)
+
 
 # Create general blackpill bootloader target
 add_library(blackpill_bootloader INTERFACE)
-target_link_libraries(blackpill_bootloader INTERFACE blackpill_config)
+target_link_libraries(blackpill_bootloader INTERFACE blackpill_common)
 target_link_libraries(blackpill_bootloader INTERFACE std_error)
 target_include_directories(blackpill_bootloader
     INTERFACE
+        src
         external/arm_cmsis/CMSIS/Core/Include
         external/stm32_device/Include
         external/stm32_hal/Inc
@@ -227,51 +272,12 @@ target_compile_definitions(blackpill_bootloader
         USE_HAL_DRIVER
         LFS_CONFIG=lfs_config.h
 )
-target_compile_options(blackpill_bootloader
-    INTERFACE
-        -mcpu=cortex-m4
-        -mthumb
-        -mfpu=fpv4-sp-d16
-        -mfloat-abi=hard
-        -fdata-sections
-        -ffunction-sections
-)
-target_link_options(blackpill_bootloader
-    INTERFACE
-        -mcpu=cortex-m4
-        -mthumb
-        -mfpu=fpv4-sp-d16
-        -mfloat-abi=hard
-        -specs=nano.specs
-        -specs=nosys.specs
-        -u _printf_float
-        -lc
-        -lm
-        #-lnosys
-        -Wl,-Map=${PROJECT_NAME}.map,--cref
-        -Wl,--gc-sections
-        -Wl,--print-memory-usage
-)
 
-# Create blackpill under testing target
-add_library(blackpill_under_testing INTERFACE)
-target_link_libraries(blackpill_under_testing INTERFACE blackpill_config)
-target_link_libraries(blackpill_under_testing INTERFACE std_error)
-target_sources(blackpill_under_testing
-    INTERFACE
-        src/devices/mcp23017_expander.h
-        src/devices/mcp23017_expander.c
-        src/node_T01.h
-        src/node_T01.c
-        src/node_B02.h
-        src/node_B02.c
-)
 
 # Create blackpill firmware target
 add_library(blackpill_firmware INTERFACE)
 target_link_libraries(blackpill_firmware INTERFACE blackpill_bootloader)
-target_link_libraries(blackpill_firmware INTERFACE blackpill_under_testing)
-target_link_libraries(blackpill_firmware INTERFACE node)
+target_link_libraries(blackpill_firmware INTERFACE blackpill_testing)
 target_link_libraries(blackpill_firmware INTERFACE vs1838_control)
 target_link_libraries(blackpill_firmware INTERFACE bmp280_sensor)
 target_include_directories(blackpill_firmware
@@ -324,6 +330,8 @@ target_sources(blackpill_firmware
 
         src/board_T01.h
         src/board_T01.c
+        src/board_B02.h
+        src/board_B02.c
 
         src/devices/ssd1306_display.h
         src/devices/ssd1306_display.c

@@ -12,7 +12,7 @@ int board_T01_init (board_extension_config_t const * const init_config, std_erro
 
 void board_T01_is_remote_control_enabled (bool * const is_remote_control_enabled);
 
-void board_T01_is_lightning_on (bool * const is_lightning_on);
+void board_T01_disable_lightning (uint32_t period_ms, bool * const is_lightning_disabled);
 void board_T01_process_remote_button (board_remote_button_t remote_button);
 void board_T01_process_photoresistor_data (photoresistor_data_t const * const data, uint32_t * const next_time_ms);
 void board_T01_process_node_msg (node_msg_t const * const rcv_msg);

@@ -9,7 +9,7 @@
 #define NODE_B02_LIGHT_DURATION_MS      (30U * 1000U)       // 30 seconds
 #define NODE_B02_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
 #define NODE_B02_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
-#define NODE_B02_LUMINOSITY_PERIOD_MS   (2U * 60U * 1000U)  // 2 min
+#define NODE_B02_LUMINOSITY_PERIOD_MS   (5U * 60U * 1000U)  // 5 min
 #define NODE_B02_TEMPERATURE_PERIOD_MS  (2U * 60U * 1000U)  // 2 min
 
 #define NODE_B02_DARKNESS_LEVEL_LUX 5.5F
@@ -22,8 +22,6 @@
 #include "board.type.h"
 
 typedef struct node_B02 node_B02_t;
-typedef struct std_error std_error_t;
-
 
 typedef struct node_B02_light_strip
 {
@@ -93,17 +91,17 @@ void node_B02_process_front_movement (  node_B02_t * const self,
 void node_B02_process_veranda_movement (node_B02_t * const self,
                                         uint32_t time_ms);
 
-void node_B02_process_rcv_msg ( node_B02_t * const self,
-                                node_msg_t const * const rcv_msg,
-                                uint32_t time_ms);
+void node_B02_process_msg ( node_B02_t * const self,
+                            node_msg_t const * const rcv_msg,
+                            uint32_t time_ms);
 
 void node_B02_get_display_data (node_B02_t const * const self,
                                 node_B02_temperature_t * const data,
                                 uint32_t * const disable_time_ms);
 
-int node_B02_get_msg (  node_B02_t * const self,
+void node_B02_get_msg ( node_B02_t * const self,
                         node_msg_t *msg,
-                        std_error_t * const error);
+                        bool * const is_msg_valid);
 
 #ifdef __cplusplus
 }

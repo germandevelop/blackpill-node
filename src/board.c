@@ -54,7 +54,7 @@
 #define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT    5U
-#define PHOTORESISTOR_INITIAL_PERIOD_MS     (30U * 1000U)   // 30 sec
+#define PHOTORESISTOR_INITIAL_PERIOD_MS     (1U * 60U * 1000U) // 1 min
 
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
@@ -95,7 +95,6 @@ static void board_init_remote_control ();
 
 static void board_update_status_led (board_led_color_t led_color);
 static int board_set_status_led_color (board_led_color_t led_color, std_error_t * const error);
-static int board_read_photoresistor (uint32_t * const photoresistor_adc, std_error_t * const error);
 static void board_remote_control_ISR (uint32_t captured_value);
 
 static void board_uart_2_print (const uint8_t *data, uint16_t data_size);
@@ -172,6 +171,7 @@ void board_task (void *parameters)
 
         config.refresh_watchdog_callback();
     }
+    
     return;
 }
 
@@ -237,8 +237,6 @@ void board_init_expander ()
     if (board_i2c_1_init(&error) != STD_SUCCESS)
     {
         LOG("Board [I2C_1] : %s\r\n", error.text);
-
-        return;
     }
 
     LOG("Board [expander] : init (MCP23017)\r\n");
@@ -292,8 +290,6 @@ void board_init_storage ()
     if (board_spi_1_init(&error) != STD_SUCCESS)
     {
         LOG("Board [SPI_1] : %s\r\n", error.text);
-
-        return;
     }
 
     LOG("Board [storage] : init\r\n");
@@ -325,6 +321,8 @@ void board_init_extension ()
     board_extension_config_t config;
     config.mcp23017_expander            = &mcp23017_expander;
     config.storage                      = &storage;
+    config.lock_i2c_1_callback          = board_i2c_1_lock;
+    config.unlock_i2c_1_callback        = board_i2c_1_unlock;
     config.update_status_led_callback   = board_update_status_led;
     config.send_node_msg_callback       = node_send_msg;
 
@@ -370,8 +368,6 @@ void board_init_tcp_client ()
     if (board_exti_1_init(tcp_client_ISR, &error) != STD_SUCCESS)
     {
         LOG("Board [EXTI_1] : %s\r\n", error.text);
-
-        return;
     }
 
     LOG("Board [tcp_client] : init\r\n");
@@ -445,27 +441,29 @@ void board_init_remote_control ()
             LOG("Board [remote_control] : %s\r\n", error.text);
         }
     }
+
     return;
 }
 
 
 void board_update_status_led (board_led_color_t led_color)
 {
-    board_led_color_t current_led_color;
-
-    xSemaphoreTake(status_led_mutex, portMAX_DELAY);
-    current_led_color = status_led_color;
-    xSemaphoreGive(status_led_mutex);
-
-    if (led_color != current_led_color)
+    if (led_color != status_led_color)
     {
-        LOG("Board [status_led] : update\r\n");
-
         xSemaphoreTake(status_led_mutex, portMAX_DELAY);
-        status_led_color = led_color;
+        const board_led_color_t current_led_color = status_led_color;
         xSemaphoreGive(status_led_mutex);
 
-        xTaskNotify(task, STATUS_LED_NOTIFICATION, eSetBits);
+        if (led_color != current_led_color)
+        {
+            LOG("Board [status_led] : update\r\n");
+
+            xSemaphoreTake(status_led_mutex, portMAX_DELAY);
+            status_led_color = led_color;
+            xSemaphoreGive(status_led_mutex);
+
+            xTaskNotify(task, STATUS_LED_NOTIFICATION, eSetBits);
+        }
     }
 
     return;
@@ -505,102 +503,113 @@ void board_photoresistor_timer (TimerHandle_t timer)
 {
     UNUSED(timer);
 
-    std_error_t error;
-    std_error_init(&error);
+    const uint32_t initial_period_ms    = 1U * 1000U;
+    const uint32_t iteration_period_ms  = 500U;
+    const uint32_t adc_timeout_ms       = 200U;
 
-    bool is_timer_started = false;
+    const uint32_t disable_period_ms = initial_period_ms + ((iteration_period_ms + adc_timeout_ms) * PHOTORESISTOR_MEAUSEREMENT_COUNT);
 
-    bool is_lightning_on;
-    setup.is_lightning_on_callback(&is_lightning_on);
+    bool is_lightning_disabled;
+    setup.disable_lightning_callback(disable_period_ms, &is_lightning_disabled);
 
-    if (is_lightning_on != true)
+    if (is_lightning_disabled == true)
     {
-        if (board_set_status_led_color(NO_COLOR, &error) == STD_SUCCESS)
+        uint32_t divider_adc;
+        bool is_divider_adc_valid = false;
+
+        // Collect adc data
         {
-            uint32_t divider_adc = 0U;
+            std_error_t error;
+            std_error_init(&error);
 
-            if (board_read_photoresistor(&divider_adc, &error) != STD_FAILURE)
+            xSemaphoreTake(status_led_mutex, portMAX_DELAY);
+
+            if (board_set_status_led_color(NO_COLOR, &error) == STD_SUCCESS)
             {
-                const uint32_t adc_max_value        = 4095U;
-                const float supply_voltage_V        = 3.3F;
-                const float divider_resistance_Ohm  = 10000.0F;
+                if (board_adc_1_init(&error) == STD_SUCCESS)
+                {
+                    vTaskDelay(initial_period_ms);
 
-                const uint32_t adc_value = adc_max_value - divider_adc;
+                    uint32_t adc_buffer         = 0U;
+                    uint32_t adc_buffer_size    = 0U;
 
-                photoresistor_data_t data;
-                data.voltage_V  = supply_voltage_V * ((float)(adc_value) / (float)(adc_max_value));
+                    for (size_t i = 0U; i < PHOTORESISTOR_MEAUSEREMENT_COUNT; ++i)
+                    {
+                        vTaskDelay(iteration_period_ms);
 
-                const float divider_voltage_V = supply_voltage_V - data.voltage_V;
-                const float current_A = divider_voltage_V / divider_resistance_Ohm;
+                        uint32_t adc_value;
 
-                data.resistance_Ohm = (uint32_t)(data.voltage_V / current_A);
+                        if (board_adc_1_read_value(&adc_value, adc_timeout_ms, &error) == STD_SUCCESS)
+                        {
+                            LOG("Board [photoresistor] : adc = %lu\r\n", adc_value);
 
-                LOG("Board [photoresistor] : voltage = %.2f V\r\n", data.voltage_V);
-                LOG("Board [photoresistor] : resistance = %lu Ohm\r\n", data.resistance_Ohm);
+                            adc_buffer += adc_value;
+                            ++adc_buffer_size;
+                        }
+                        else
+                        {
+                            LOG("Board [photoresistor] : %s\r\n", error.text);
+                        }
+                    }
 
-                uint32_t timer_period_ms;
-                setup.process_photoresistor_data_callback(&data, &timer_period_ms);
+                    if (adc_buffer_size != 0U)
+                    {
+                        divider_adc = adc_buffer / adc_buffer_size;
+                        is_divider_adc_valid = true;
+                    }
+                }
+                else
+                {
+                    LOG("Board [photoresistor] : %s\r\n", error.text);
+                }
 
-                xTimerChangePeriod(photoresistor_timer, timer_period_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+                board_adc_1_deinit();
             }
             else
             {
-                LOG("Board [photoresistor] : %s\r\n", error.text);
+                LOG("Board [status_led] : %s\r\n", error.text);
             }
+
+            if (board_set_status_led_color(status_led_color, &error) != STD_SUCCESS)
+            {
+                LOG("Board [status_led] : %s\r\n", error.text);
+            }
+
+            xSemaphoreGive(status_led_mutex);
+        }
+
+        // Calculate resistance and voltage
+        if (is_divider_adc_valid == true)
+        {
+            const uint32_t adc_max_value        = 4095U;
+            const float supply_voltage_V        = 3.3F;
+            const float divider_resistance_Ohm  = 10000.0F;
+
+            const uint32_t adc_value = adc_max_value - divider_adc;
+
+            photoresistor_data_t data;
+            data.voltage_V  = supply_voltage_V * ((float)(adc_value) / (float)(adc_max_value));
+
+            const float divider_voltage_V = supply_voltage_V - data.voltage_V;
+            const float current_A = divider_voltage_V / divider_resistance_Ohm;
+
+            data.resistance_Ohm = (uint32_t)(data.voltage_V / current_A);
+
+            LOG("Board [photoresistor] : voltage = %.2f V\r\n", data.voltage_V);
+            LOG("Board [photoresistor] : resistance = %lu Ohm\r\n", data.resistance_Ohm);
+
+            uint32_t timer_period_ms;
+            setup.process_photoresistor_data_callback(&data, &timer_period_ms);
+
+            xTimerChangePeriod(photoresistor_timer, (timer_period_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
         }
         else
         {
-            LOG("Board [status_led] : %s\r\n", error.text);
+            xTimerStart(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
         }
     }
-
-    if (is_timer_started != true)
-    {
-        xTimerStart(photoresistor_timer, RTOS_TIMER_TICKS_TO_WAIT);
-    }
-
-    xTaskNotify(task, STATUS_LED_NOTIFICATION, eSetBits);
 
     return;
-}
-
-int board_read_photoresistor (uint32_t * const photoresistor_adc, std_error_t * const error)
-{
-    int exit_code = board_adc_1_init(error);
-
-    if (exit_code == STD_SUCCESS)
-    {
-        uint32_t photoresistor_buffer       = 0U;
-        uint32_t photoresistor_buffer_size  = 0U;
-
-        const uint32_t timeout_ms = 1U * 1000U;
-
-        for (size_t i = 0U; i < PHOTORESISTOR_MEAUSEREMENT_COUNT; ++i)
-        {
-            vTaskDelay(1U * 1000U);
-
-            uint32_t adc_value;
-            exit_code = board_adc_1_read_value(&adc_value, timeout_ms, error);
-
-            if (exit_code == STD_SUCCESS)
-            {
-                photoresistor_buffer += adc_value;
-                ++photoresistor_buffer_size;
-            }
-        }
-
-        if (photoresistor_buffer_size != 0U)
-        {
-            *photoresistor_adc = photoresistor_buffer / photoresistor_buffer_size;
-        }
-        else
-        {
-            exit_code = STD_FAILURE;
-        }
-    }
-    board_adc_1_deinit();
-
-    return exit_code;
 }
 
 void board_remote_control_ISR (uint32_t captured_value)
@@ -623,7 +632,7 @@ void board_remote_control_ISR (uint32_t captured_value)
         [LEFT_BUTTON]   = LEFT_BUTTON_CODE,
         [OK_BUTTON]     = OK_BUTTON_CODE,
         [RIGHT_BUTTON]  = RIGHT_BUTTON_CODE,
-        [DOWN_BUTTON]   = DOWN_BUTTON_CODE,
+        [DOWN_BUTTON]   = DOWN_BUTTON_CODE
     };
 
     vs1838_control_process_bit(&vs1838_control, captured_value);
@@ -659,6 +668,7 @@ void board_remote_control_ISR (uint32_t captured_value)
 
         portYIELD_FROM_ISR(is_higher_priority_task_woken);
     }
+
     return;
 }
 

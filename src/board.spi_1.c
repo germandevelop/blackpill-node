@@ -124,6 +124,7 @@ void board_spi_1_msp_init (SPI_HandleTypeDef *spi_handler)
     UNUSED(spi_handler);
 
     // Peripheral clock enable
+    __HAL_RCC_SPI1_CLK_SLEEP_ENABLE();
     __HAL_RCC_SPI1_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 

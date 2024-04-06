@@ -9,7 +9,7 @@
 #define NODE_T01_LIGHT_DURATION_MS      (30U * 1000U)       // 30 seconds
 #define NODE_T01_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
 #define NODE_T01_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
-#define NODE_T01_LUMINOSITY_PERIOD_MS   (2U * 60U * 1000U)  // 2 min
+#define NODE_T01_LUMINOSITY_PERIOD_MS   (5U * 60U * 1000U)  // 5 min
 #define NODE_T01_HUMIDITY_PERIOD_MS     (2U * 60U * 1000U)  // 2 min
 #define NODE_T01_DOOR_STATE_PERIOD_MS   (2U * 60U * 1000U)  // 2 min
 
@@ -25,7 +25,6 @@
 #include "board.type.h"
 
 typedef struct node_T01 node_T01_t;
-typedef struct std_error std_error_t;
 
 typedef struct node_T01_state
 {
@@ -96,9 +95,9 @@ void node_T01_get_display_data (node_T01_t const * const self,
                                 node_T01_humidity_t * const data,
                                 uint32_t * const disable_time_ms);
 
-int node_T01_get_msg (  node_T01_t * const self,
+void node_T01_get_msg ( node_T01_t * const self,
                         node_msg_t *msg,
-                        std_error_t * const error);
+                        bool * const is_msg_valid);
 
 #ifdef __cplusplus
 }
