@@ -31,7 +31,7 @@
 #define RTOS_TASK_PRIORITY      1U          // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "board_T01" // 16 - max length
 
-#define RTOS_TIMER_TICKS_TO_WAIT    (1U * 1000U)
+#define RTOS_TIMER_TICKS_TO_WAIT (100U)
 
 #define FRONT_PIR_NOTIFICATION          (1 << 0)
 #define UPDATE_STATE_NOTIFICATION       (1 << 1)
@@ -134,8 +134,8 @@ void board_T01_task (void *parameters)
         }
     }
 
-    xTimerChangePeriod(humidity_timer, (NODE_T01_HUMIDITY_PERIOD_MS / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
-    xTimerChangePeriod(reed_switch_timer, (NODE_T01_DOOR_STATE_PERIOD_MS / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(humidity_timer, pdMS_TO_TICKS(NODE_T01_HUMIDITY_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(reed_switch_timer, pdMS_TO_TICKS(NODE_T01_DOOR_STATE_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
 
     while (true)
     {
@@ -196,7 +196,7 @@ void board_T01_task (void *parameters)
                 {
                     if (xTimerIsTimerActive(light_timer) == pdFALSE)
                     {
-                        xTimerChangePeriod(light_timer, (1U / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+                        xTimerChangePeriod(light_timer, pdMS_TO_TICKS(1U), RTOS_TIMER_TICKS_TO_WAIT);
                     }
                 }
 
@@ -205,7 +205,7 @@ void board_T01_task (void *parameters)
                 {
                     if (xTimerIsTimerActive(display_timer) == pdFALSE)
                     {
-                        xTimerChangePeriod(display_timer, (1U / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+                        xTimerChangePeriod(display_timer, pdMS_TO_TICKS(1U), RTOS_TIMER_TICKS_TO_WAIT);
                     }
                 }
 
@@ -215,7 +215,7 @@ void board_T01_task (void *parameters)
                     if (xTimerIsTimerActive(warning_led_timer) == pdFALSE)
                     {
                         board_T01_enable_warning_led_power();
-                        xTimerChangePeriod(warning_led_timer, WARNING_LED_ON_PERIOD_MS / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+                        xTimerChangePeriod(warning_led_timer, pdMS_TO_TICKS(WARNING_LED_ON_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
                     }
                 }
                 else
@@ -294,7 +294,7 @@ void board_T01_disable_lightning (uint32_t period_ms, bool * const is_lightning_
     xTimerStop(display_timer, RTOS_TIMER_TICKS_TO_WAIT);
     board_T01_disable_display_power();
 
-    xTimerChangePeriod(lightning_block_timer, period_ms / portTICK_PERIOD_MS, RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(lightning_block_timer, pdMS_TO_TICKS(period_ms), RTOS_TIMER_TICKS_TO_WAIT);
 
     return;
 }
@@ -350,7 +350,7 @@ void board_T01_humidity_timer (TimerHandle_t timer)
     node_T01_process_humidity(node, &humidity, &next_time_ms);
     xSemaphoreGive(node_mutex);
 
-    xTimerChangePeriod(humidity_timer, (next_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(humidity_timer, pdMS_TO_TICKS(next_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
 
@@ -381,7 +381,7 @@ void board_T01_reed_switch_timer (TimerHandle_t timer)
     node_T01_process_door_state(node, is_door_open, &next_time_ms);
     xSemaphoreGive(node_mutex);
 
-    xTimerChangePeriod(reed_switch_timer, (next_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+    xTimerChangePeriod(reed_switch_timer, pdMS_TO_TICKS(next_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
 
     xTaskNotify(task, UPDATE_STATE_NOTIFICATION, eSetBits);
 
@@ -418,7 +418,7 @@ void board_T01_light_timer (TimerHandle_t timer)
         node_T01_get_light_data(node, &disable_time_ms);
         xSemaphoreGive(node_mutex);
 
-        xTimerChangePeriod(light_timer, (disable_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerChangePeriod(light_timer, pdMS_TO_TICKS(disable_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
     }
     else
     {
@@ -455,7 +455,7 @@ void board_T01_warning_led_timer (TimerHandle_t timer)
 
         board_T01_enable_warning_led_power();
 
-        xTimerChangePeriod(warning_led_timer, (WARNING_LED_ON_PERIOD_MS / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerChangePeriod(warning_led_timer, pdMS_TO_TICKS(WARNING_LED_ON_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
     }
     else
     {
@@ -463,7 +463,7 @@ void board_T01_warning_led_timer (TimerHandle_t timer)
 
         board_T01_disable_warning_led_power();
 
-        xTimerChangePeriod(warning_led_timer, (WARNING_LED_OFF_PERIOD_MS / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerChangePeriod(warning_led_timer, pdMS_TO_TICKS(WARNING_LED_OFF_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
     }
 
     return;
@@ -520,12 +520,12 @@ void board_T01_display_timer (TimerHandle_t timer)
         node_T01_get_display_data(node, &data, &disable_time_ms);
         xSemaphoreGive(node_mutex);
 
-        vTaskDelay(1U * 1000U);
+        vTaskDelay(pdMS_TO_TICKS(1U * 1000U));
 
         board_T01_draw_yellow_display(&data);
         board_T01_draw_blue_display(&data);
 
-        xTimerChangePeriod(display_timer, (disable_time_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+        xTimerChangePeriod(display_timer, pdMS_TO_TICKS(disable_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
     }
     else
     {
@@ -729,12 +729,12 @@ int board_T01_malloc (std_error_t * const error)
 
     const bool are_semaphores_allocated = (node_mutex != NULL) && (lightning_block_mutex != NULL);
 
-    humidity_timer          = xTimerCreate("humidity", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_humidity_timer);
-    reed_switch_timer       = xTimerCreate("reed_switch", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_reed_switch_timer);
-    lightning_block_timer   = xTimerCreate("lightning_block", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_lightning_block_timer);
-    light_timer             = xTimerCreate("light", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_light_timer);
-    display_timer           = xTimerCreate("display", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_display_timer);
-    warning_led_timer       = xTimerCreate("warning_led", (1000U / portTICK_PERIOD_MS), pdFALSE, NULL, board_T01_warning_led_timer);
+    humidity_timer          = xTimerCreate("humidity", pdMS_TO_TICKS(1000U), pdFALSE, NULL, board_T01_humidity_timer);
+    reed_switch_timer       = xTimerCreate("reed_switch", pdMS_TO_TICKS(1000U), pdFALSE, NULL, board_T01_reed_switch_timer);
+    lightning_block_timer   = xTimerCreate("lightning_block", pdMS_TO_TICKS(1000U), pdFALSE, NULL, board_T01_lightning_block_timer);
+    light_timer             = xTimerCreate("light", pdMS_TO_TICKS(1000U), pdFALSE, NULL, board_T01_light_timer);
+    display_timer           = xTimerCreate("display", pdMS_TO_TICKS(1000U), pdFALSE, NULL, board_T01_display_timer);
+    warning_led_timer       = xTimerCreate("warning_led", pdMS_TO_TICKS(1000U), pdFALSE, NULL, board_T01_warning_led_timer);
 
     const bool are_timers_allocated = (humidity_timer != NULL) && (reed_switch_timer != NULL) &&
                                         (lightning_block_timer != NULL) && (light_timer != NULL) &&

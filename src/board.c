@@ -44,7 +44,7 @@
 #define RTOS_TASK_PRIORITY      4U      // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "board" // 16 - max length
 
-#define RTOS_TIMER_TICKS_TO_WAIT  (1U * 1000U)
+#define RTOS_TIMER_TICKS_TO_WAIT (100U)
 
 #define STATUS_LED_NOTIFICATION     (1 << 0)
 #define REMOTE_BUTTON_NOTIFICATION  (1 << 1)
@@ -528,14 +528,14 @@ void board_photoresistor_timer (TimerHandle_t timer)
             {
                 if (board_adc_1_init(&error) == STD_SUCCESS)
                 {
-                    vTaskDelay(initial_period_ms);
+                    vTaskDelay(pdMS_TO_TICKS(initial_period_ms));
 
                     uint32_t adc_buffer         = 0U;
                     uint32_t adc_buffer_size    = 0U;
 
                     for (size_t i = 0U; i < PHOTORESISTOR_MEAUSEREMENT_COUNT; ++i)
                     {
-                        vTaskDelay(iteration_period_ms);
+                        vTaskDelay(pdMS_TO_TICKS(iteration_period_ms));
 
                         uint32_t adc_value;
 
@@ -601,7 +601,7 @@ void board_photoresistor_timer (TimerHandle_t timer)
             uint32_t timer_period_ms;
             setup.process_photoresistor_data_callback(&data, &timer_period_ms);
 
-            xTimerChangePeriod(photoresistor_timer, (timer_period_ms / portTICK_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
+            xTimerChangePeriod(photoresistor_timer, pdMS_TO_TICKS(timer_period_ms), RTOS_TIMER_TICKS_TO_WAIT);
         }
         else
         {
@@ -683,7 +683,7 @@ int board_malloc (std_error_t * const error)
     const bool are_semaphores_allocated = (status_led_mutex != NULL) && (remote_button_mutex != NULL) &&
                                             (spi_1_mutex != NULL) && (i2c_1_mutex != NULL);
 
-    photoresistor_timer = xTimerCreate("photoresistor", (PHOTORESISTOR_INITIAL_PERIOD_MS / portTICK_PERIOD_MS), pdFALSE, NULL, board_photoresistor_timer);
+    photoresistor_timer = xTimerCreate("photoresistor", pdMS_TO_TICKS(PHOTORESISTOR_INITIAL_PERIOD_MS), pdFALSE, NULL, board_photoresistor_timer);
 
     const bool are_timers_allocated = (photoresistor_timer != NULL);
 

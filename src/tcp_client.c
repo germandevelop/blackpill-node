@@ -130,14 +130,14 @@ void tcp_client_task (void *parameters)
         {
             LOG("TCP-Client : %s\r\n", error.text);
 
-            vTaskDelay(5U * 1000U);
+            vTaskDelay(pdMS_TO_TICKS(5U * 1000U));
         }
         else
         {
             break;
         }
     }
-    vTaskDelay(5U * 1000U);
+    vTaskDelay(pdMS_TO_TICKS(5U * 1000U));
 
     bool is_connected = false;
 
@@ -225,7 +225,7 @@ void tcp_client_task (void *parameters)
                 {
                     LOG("TCP-Client : Connection fail\r\n");
 
-                    vTaskDelay(RECONNECTION_TIMEOUT_S * 1000U);
+                    vTaskDelay(pdMS_TO_TICKS(RECONNECTION_TIMEOUT_S * 1000U));
                 }
                 else
                 {

@@ -25,7 +25,7 @@
 #define RTOS_TASK_PRIORITY      2U      // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "node"  // 16 - max length
 
-#define RTOS_QUEUE_TICKS_TO_WAIT    (1U * 100U)
+#define RTOS_QUEUE_TICKS_TO_WAIT (100U)
 
 #define MSG_BUFFER_SIZE     8U
 #define TCP_MSG_BUFFER_SIZE 4U

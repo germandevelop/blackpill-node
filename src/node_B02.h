@@ -7,6 +7,7 @@
 #define NODE_B02_H
 
 #define NODE_B02_LIGHT_DURATION_MS      (30U * 1000U)       // 30 seconds
+#define NODE_B02_BUZZER_DURATION_MS     (10U * 1000U)       // 10 seconds
 #define NODE_B02_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
 #define NODE_B02_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
 #define NODE_B02_LUMINOSITY_PERIOD_MS   (5U * 60U * 1000U)  // 5 min

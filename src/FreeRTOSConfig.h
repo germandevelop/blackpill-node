@@ -77,7 +77,7 @@ extern uint32_t SystemCoreClock;
 // Timers
 #define configUSE_TIMERS              1
 #define configTIMER_TASK_PRIORITY     (0)
-#define configTIMER_QUEUE_LENGTH      16
+#define configTIMER_QUEUE_LENGTH      32
 
 // Co-routines
 #define configUSE_CO_ROUTINES           0
