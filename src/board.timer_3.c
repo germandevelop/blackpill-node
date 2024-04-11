@@ -87,20 +87,6 @@ void board_timer_3_deinit ()
     return;
 }
 
-void board_timer_3_enable_clock ()
-{
-    __HAL_RCC_TIM3_CLK_ENABLE();
-
-    return;
-}
-
-void board_timer_3_disable_clock ()
-{
-    __HAL_RCC_TIM3_CLK_DISABLE();
-
-    return;
-}
-
 int board_timer_3_start_channel_1 (std_error_t * const error)
 {
     const HAL_StatusTypeDef status = HAL_TIM_PWM_Start(&timer_3_handler, TIM_CHANNEL_1);

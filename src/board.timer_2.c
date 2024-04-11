@@ -109,16 +109,14 @@ int board_timer_2_init (board_timer_2_config_t const * const init_config, std_er
     }
 
     board_timer_2_pwm_msp_post_init();
-
-    timer_2_handler.IC_CaptureCallback = board_timer_2_ic_capture_callback;
     
     return STD_SUCCESS;
 }
 
 void board_timer_2_deinit ()
 {
-    HAL_TIM_PWM_DeInit(&timer_2_handler);
     HAL_TIM_IC_DeInit(&timer_2_handler);
+    HAL_TIM_PWM_DeInit(&timer_2_handler);
 
     return;
 }
@@ -163,13 +161,6 @@ void board_timer_2_stop_channel_3 ()
     return;
 }
 
-void TIM2_IRQHandler ()
-{
-    HAL_TIM_IRQHandler(&timer_2_handler);
-
-    return;
-}
-
 
 void board_timer_2_ic_msp_init (TIM_HandleTypeDef *timer_handler)
 {
@@ -205,8 +196,7 @@ void board_timer_2_ic_msp_deinit (TIM_HandleTypeDef *timer_handler)
     __HAL_RCC_TIM2_CLK_DISABLE();
 
     // TIM2 GPIO Configuration
-    // PB10     ------> TIM2_CH3
-    // PB3     ------> TIM2_CH2
+    // PB10    ------> TIM2_CH3
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);
 
     // TIM2 interrupt DeInit
@@ -215,22 +205,31 @@ void board_timer_2_ic_msp_deinit (TIM_HandleTypeDef *timer_handler)
     return;
 }
 
+void TIM2_IRQHandler ()
+{
+    HAL_TIM_IRQHandler(&timer_2_handler);
+
+    return;
+}
+
 void board_timer_2_ic_capture_callback (TIM_HandleTypeDef *timer_handler)
 {
-    UNUSED(timer_handler);
+    const uint32_t captured_value = HAL_TIM_ReadCapturedValue(timer_handler, TIM_CHANNEL_3);
 
-    const uint32_t captured_value = HAL_TIM_ReadCapturedValue(&timer_2_handler, TIM_CHANNEL_3);
-
-    __HAL_TIM_SET_COUNTER(&timer_2_handler, 0U);
+    __HAL_TIM_SET_COUNTER(timer_handler, 0U);
 
     config.ic_isr_callback(captured_value);
 
     return;
 }
 
+
 void board_timer_2_pwm_msp_init (TIM_HandleTypeDef *timer_handler)
 {
     UNUSED(timer_handler);
+
+    // Peripheral clock enable
+    __HAL_RCC_TIM2_CLK_ENABLE();
 
     return;
 }
@@ -238,12 +237,19 @@ void board_timer_2_pwm_msp_init (TIM_HandleTypeDef *timer_handler)
 void board_timer_2_pwm_msp_deinit (TIM_HandleTypeDef *timer_handler)
 {
     UNUSED(timer_handler);
+
+    // TIM2 GPIO Configuration
+    // PB3     ------> TIM2_CH2
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_3);
     
     return;
 }
 
 void board_timer_2_pwm_msp_post_init ()
 {
+    // Peripheral clock enable
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
     // TIM2 GPIO Configuration
     // PB3     ------> TIM2_CH2
     GPIO_InitTypeDef GPIO_InitStruct = { 0 };

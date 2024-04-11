@@ -349,9 +349,7 @@ void node_B02_process_door_movement (node_B02_t * const self,
                 size_t j = 0U;
 
                 self->send_msg_buffer[i].header.source = self->id;
-                self->send_msg_buffer[i].header.dest_array[j] = NODE_B01;
-                ++j;
-                self->send_msg_buffer[i].header.dest_array[j] = NODE_T01;
+                self->send_msg_buffer[i].header.dest_array[j] = NODE_BROADCAST;
                 ++j;
                 self->send_msg_buffer[i].header.dest_array_size = j;
 
@@ -406,9 +404,7 @@ void node_B02_process_veranda_movement (node_B02_t * const self,
                 size_t j = 0U;
 
                 self->send_msg_buffer[i].header.source = self->id;
-                self->send_msg_buffer[i].header.dest_array[j] = NODE_B01;
-                ++j;
-                self->send_msg_buffer[i].header.dest_array[j] = NODE_T01;
+                self->send_msg_buffer[i].header.dest_array[j] = NODE_BROADCAST;
                 ++j;
                 self->send_msg_buffer[i].header.dest_array_size = j;
 
@@ -436,7 +432,7 @@ void node_B02_process_msg ( node_B02_t * const self,
 
         for (size_t i = 0U; i < rcv_msg->header.dest_array_size; ++i)
         {
-            if (rcv_msg->header.dest_array[i] == self->id)
+            if ((rcv_msg->header.dest_array[i] == self->id) || (rcv_msg->header.dest_array[i] == NODE_BROADCAST))
             {
                 is_dest_node = true;
 
@@ -497,17 +493,6 @@ void node_B02_process_msg ( node_B02_t * const self,
             self->light_start_time_ms = 0U;
         }
     }
-
-    return;
-}
-
-void node_B02_get_light_data (  node_B02_t const * const self,
-                                uint32_t * const disable_time_ms)
-{
-    assert(self             != NULL);
-    assert(disable_time_ms  != NULL);
-
-    *disable_time_ms = NODE_B02_DISPLAY_DURATION_MS;
 
     return;
 }

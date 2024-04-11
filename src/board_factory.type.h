@@ -42,6 +42,8 @@ typedef void (*board_setup_process_msg_callback_t) (node_msg_t const * const msg
 
 typedef struct board_setup
 {
+    uint8_t unique_id[12];
+
     node_id_t node_id;
 
     board_setup_init_extension_callback_t init_extension_callback;
