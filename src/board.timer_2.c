@@ -39,6 +39,7 @@ int board_timer_2_init (board_timer_2_config_t const * const init_config, std_er
     timer_2_handler.Instance                = TIM2;
     timer_2_handler.IC_MspInitCallback      = board_timer_2_ic_msp_init;
     timer_2_handler.IC_MspDeInitCallback    = board_timer_2_ic_msp_deinit;
+    timer_2_handler.IC_CaptureCallback      = board_timer_2_ic_capture_callback;
     timer_2_handler.PWM_MspInitCallback     = board_timer_2_pwm_msp_init;
     timer_2_handler.PWM_MspDeInitCallback   = board_timer_2_pwm_msp_deinit;
     timer_2_handler.Init.Prescaler          = 1000U;

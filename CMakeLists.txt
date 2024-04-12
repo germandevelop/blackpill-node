@@ -173,6 +173,7 @@ target_compile_options(blackpill_config
 
 # Create blackpill under testing target
 add_library(blackpill_testing INTERFACE)
+target_link_libraries(blackpill_testing INTERFACE std_error)
 target_include_directories(blackpill_testing
     INTERFACE
         src
@@ -479,7 +480,8 @@ add_custom_target(flash
         -f interface/stlink.cfg
         -f target/stm32f4x.cfg
         -c \"init\; reset halt\; stm32f4x unlock 0\"
-        -c \"flash write_image erase ${CMAKE_BINARY_DIR}/silver.bin 0x08000000\"
+        -c \"flash erase_sector 0 0 last\"
+        -c \"flash write_bank 0 ${CMAKE_BINARY_DIR}/silver.bin 0\"
         -c \"reset\; exit\"
 )
 

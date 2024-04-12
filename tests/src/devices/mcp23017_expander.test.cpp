@@ -28,6 +28,10 @@ static int write_i2c_mock (uint16_t device_address, uint16_t register_address, u
      return mockConfigI2C->writeI2C(device_address, register_address, register_size, array, array_size, timeout_ms, error);
 }
 
+static void lock_i2c_mock ()
+{
+    return;
+}
 
 class Mcp23017ExpanderTestFixture : public ::testing::Test
 {
@@ -43,9 +47,11 @@ class Mcp23017ExpanderTestFixture : public ::testing::Test
             std_error_init(&error);
 
             mcp23017_expander_config_t config;
-            config.write_i2c_callback = write_i2c_mock;
-            config.read_i2c_callback  = read_i2c_mock;
-            config.i2c_timeout_ms     = 0U;
+            config.i2c_lock_callback    = lock_i2c_mock;
+            config.i2c_unlock_callback  = lock_i2c_mock;
+            config.write_i2c_callback   = write_i2c_mock;
+            config.read_i2c_callback    = read_i2c_mock;
+            config.i2c_timeout_ms       = 0U;
 
             mcp23017_expander_init(&expander, &config, &error);
         }
@@ -61,9 +67,11 @@ TEST_F(Mcp23017ExpanderTestFixture, Init)
 {
     // Arrange: create and set up a system under test
     mcp23017_expander_config_t init_config;
-    init_config.write_i2c_callback = write_i2c_mock;
-    init_config.read_i2c_callback  = read_i2c_mock;
-    init_config.i2c_timeout_ms     = 0U;
+    init_config.i2c_lock_callback   = lock_i2c_mock;
+    init_config.i2c_unlock_callback = lock_i2c_mock;
+    init_config.write_i2c_callback  = write_i2c_mock;
+    init_config.read_i2c_callback   = read_i2c_mock;
+    init_config.i2c_timeout_ms      = 0U;
 
     int expected_ret_val = STD_SUCCESS;
     mcp23017_expander_image expected;

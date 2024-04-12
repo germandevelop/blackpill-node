@@ -54,7 +54,7 @@
 #define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT    5U
-#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 10U * 1000U) // 1 min
+#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 60U * 1000U) // 1 min
 
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
@@ -126,10 +126,10 @@ void board_task (void *parameters)
     board_factory_build_setup(&setup);
 
     LOG("Board : unique id = %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
-        setup.unique_id[0], setup.unique_id[1], setup.unique_id[2], 
-        setup.unique_id[3], setup.unique_id[4], setup.unique_id[5], 
-        setup.unique_id[6], setup.unique_id[7], setup.unique_id[8], 
-        setup.unique_id[9], setup.unique_id[10], setup.unique_id[11]);
+        setup.unique_id[0], setup.unique_id[1], setup.unique_id[2], setup.unique_id[3],
+        setup.unique_id[4], setup.unique_id[5], setup.unique_id[6], setup.unique_id[7],
+        setup.unique_id[8], setup.unique_id[9], setup.unique_id[10], setup.unique_id[11]);
+
     LOG("Board : firmware version = %s.%s.%s\r\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 
     board_init_status_led();
@@ -504,6 +504,8 @@ void board_init_expander ()
     LOG("Board [expander] : init (MCP23017)\r\n");
 
     mcp23017_expander_config_t config;
+    config.i2c_lock_callback    = board_i2c_1_lock;
+    config.i2c_unlock_callback  = board_i2c_1_unlock;
     config.write_i2c_callback   = board_i2c_1_write_register;
     config.read_i2c_callback    = board_i2c_1_read_register;
     config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
@@ -647,10 +649,10 @@ void board_init_tcp_client ()
     config.spi_timeout_ms           = SPI_TIMEOUT_MS;
 
     config.mac_address[0] = 0xEA;
-    config.mac_address[1] = 0x11;
-    config.mac_address[2] = 0x22;
-    config.mac_address[3] = 0x33;
-    config.mac_address[4] = 0x44;
+    config.mac_address[1] = setup.unique_id[8];
+    config.mac_address[2] = setup.unique_id[9];
+    config.mac_address[3] = setup.unique_id[10];
+    config.mac_address[4] = setup.unique_id[11];
     config.mac_address[5] = 0xEA;
 
     config.ip_address[0] = 192;

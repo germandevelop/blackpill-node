@@ -178,7 +178,7 @@ TEST_P(NodeB02ParameterizedMsgMode, ProcessMsgMode)
     node_B02_state_t expected_state = std::get<2>(GetParam());
 
     // Act: poke the system under test
-    node_B02_process_rcv_msg(&node, &rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t result_state;
     node_B02_get_state(&node, &result_state, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
@@ -263,12 +263,12 @@ TEST_P(NodeB02ParameterizedMsgCommand, ProcessMsgCommand)
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<3>(GetParam());
 
     // Act: poke the system under test
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
+    node_B02_process_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
 
     node_B02_state_t result_state;
     node_B02_get_state(&node, &result_state, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
@@ -532,13 +532,13 @@ TEST_P(NodeB02ParameterizedMsgCommandDouble, ProcessMsgCommandDouble)
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<4>(GetParam());
 
     // Act: poke the system under test
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg_1, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg_2, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
+    node_B02_process_msg(&node, &cmd_rcv_msg_1, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
+    node_B02_process_msg(&node, &cmd_rcv_msg_2, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
 
     node_B02_state_t result_state;
     node_B02_get_state(&node, &result_state, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 3U));
@@ -889,7 +889,7 @@ TEST_P(NodeB02ParameterizedDoorPirMode, ProcessDoorPirMode)
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<2>(GetParam());
 
@@ -981,12 +981,12 @@ TEST_P(NodeB02ParameterizedDoorPirCommandBefore, ProcessDoorPirCommandBefore)
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<3>(GetParam());
 
     // Act: poke the system under test
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
+    node_B02_process_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
     node_B02_process_door_movement(&node, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
 
     node_B02_state_t result_state;
@@ -1176,13 +1176,13 @@ TEST_P(NodeB02ParameterizedDoorPirCommandAfter, ProcessDoorPirCommandAfter)
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<3>(GetParam());
 
     // Act: poke the system under test
     node_B02_process_door_movement(&node, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
+    node_B02_process_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
 
     node_B02_state_t result_state;
     node_B02_get_state(&node, &result_state, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 3U));
@@ -1412,7 +1412,7 @@ TEST_P(NodeB02ParameterizedVerandaPirMode, ProcessVerandaPirMode)
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<2>(GetParam());
 
@@ -1505,12 +1505,12 @@ TEST_P(NodeB02ParameterizedVerandaPirCommandBefore, ProcessVerandaPirCommandBefo
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<3>(GetParam());
 
     // Act: poke the system under test
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
+    node_B02_process_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
     node_B02_process_veranda_movement(&node, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
 
     node_B02_state_t result_state;
@@ -1627,13 +1627,13 @@ TEST_P(NodeB02ParameterizedVerandaPirCommandAfter, ProcessVerandaPirCommandAfter
 
     uint32_t next_time_ms;
     node_B02_process_luminosity(&node, &luminosity, &next_time_ms);
-    node_B02_process_rcv_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
+    node_B02_process_msg(&node, &mode_rcv_msg, (NODE_B02_LIGHT_DURATION_MS * 2U));
 
     node_B02_state_t expected_state = std::get<3>(GetParam());
 
     // Act: poke the system under test
     node_B02_process_veranda_movement(&node, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 1U));
-    node_B02_process_rcv_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
+    node_B02_process_msg(&node, &cmd_rcv_msg, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 2U));
 
     node_B02_state_t result_state;
     node_B02_get_state(&node, &result_state, ((NODE_B02_LIGHT_DURATION_MS * 2U) + 3U));

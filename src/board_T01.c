@@ -489,16 +489,17 @@ void board_T01_draw_blue_display (node_T01_humidity_t const * const data, std_er
     // Draw the text
     uint8_t ssd1306_pixel_buffer[SSD1306_DISPLAY_PIXEL_BUFFER_SIZE];
 
-    ssd1306_display_config_t config;
-    config.write_i2c_callback       = board_i2c_1_write;
-    config.write_i2c_dma_callback   = NULL;
-    config.i2c_timeout_ms           = I2C_TIMEOUT_MS;
-    config.pixel_buffer             = ssd1306_pixel_buffer;
-    config.device_address           = SSD1306_DISPLAY_ADDRESS_2;
+    ssd1306_display_config_t display_config;
+    display_config.lock_i2c_callback    = config.lock_i2c_1_callback;
+    display_config.unlock_i2c_callback  = config.unlock_i2c_1_callback;
+    display_config.write_i2c_callback   = board_i2c_1_write;
+    display_config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
+    display_config.pixel_buffer         = ssd1306_pixel_buffer;
+    display_config.device_address       = SSD1306_DISPLAY_ADDRESS_2;
 
     ssd1306_display_t ssd1306_display;
 
-    if (ssd1306_display_init(&ssd1306_display, &config, error) != STD_SUCCESS)
+    if (ssd1306_display_init(&ssd1306_display, &display_config, error) != STD_SUCCESS)
     {
         LOG("Board T01 [display] : blue = %s\r\n", error->text);
 
@@ -572,16 +573,17 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data, std_
     // Draw the text
     uint8_t ssd1306_pixel_buffer[SSD1306_DISPLAY_PIXEL_BUFFER_SIZE];
 
-    ssd1306_display_config_t config;
-    config.write_i2c_callback       = board_i2c_1_write;
-    config.write_i2c_dma_callback   = NULL;
-    config.i2c_timeout_ms           = I2C_TIMEOUT_MS;
-    config.pixel_buffer             = ssd1306_pixel_buffer;
-    config.device_address           = SSD1306_DISPLAY_ADDRESS_1;
+    ssd1306_display_config_t display_config;
+    display_config.lock_i2c_callback    = config.lock_i2c_1_callback;
+    display_config.unlock_i2c_callback  = config.unlock_i2c_1_callback;
+    display_config.write_i2c_callback   = board_i2c_1_write;
+    display_config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
+    display_config.pixel_buffer         = ssd1306_pixel_buffer;
+    display_config.device_address       = SSD1306_DISPLAY_ADDRESS_1;
 
     ssd1306_display_t ssd1306_display;
 
-    if (ssd1306_display_init(&ssd1306_display, &config, error) != STD_SUCCESS)
+    if (ssd1306_display_init(&ssd1306_display, &display_config, error) != STD_SUCCESS)
     {
         LOG("Board T01 [display] : yellow = %s\r\n", error->text);
 
@@ -778,13 +780,15 @@ void board_B02_init_humidity_sensor ()
     std_error_t error;
     std_error_init(&error);
 
-    bme280_sensor_config_t config;
-    config.write_i2c_callback   = board_i2c_1_write_register;
-    config.read_i2c_callback    = board_i2c_1_read_register;
-    config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
-    config.delay_callback       = vTaskDelay;
+    bme280_sensor_config_t sensor_config;
+    sensor_config.lock_i2c_callback     = config.lock_i2c_1_callback;
+    sensor_config.unlock_i2c_callback   = config.unlock_i2c_1_callback;
+    sensor_config.write_i2c_callback    = board_i2c_1_write_register;
+    sensor_config.read_i2c_callback     = board_i2c_1_read_register;
+    sensor_config.i2c_timeout_ms        = I2C_TIMEOUT_MS;
+    sensor_config.delay_callback        = vTaskDelay;
 
-    if (bme280_sensor_init(&config, &error) != STD_SUCCESS)
+    if (bme280_sensor_init(&sensor_config, &error) != STD_SUCCESS)
     {
         LOG("Board T01 [bme280] : %s\r\n", error.text);
     }

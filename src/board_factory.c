@@ -28,7 +28,7 @@ void board_factory_build_setup (board_setup_t * const setup)
         setup->unique_id[i] = STM32_UUID[i];
     }
 
-    const uint8_t unique_id_T01[] = { 0x0F, 0x00, 0x38, 0x00, 0x12, 0x51, 0x35, 0x31, 0x31, 0x36, 0x35, 0x38 };
+    const uint8_t unique_id_T01[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     const uint8_t unique_id_B02[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
     if (memcmp((const void*)(setup->unique_id), (const void*)(unique_id_T01), sizeof(setup->unique_id)) == 0)
@@ -43,7 +43,8 @@ void board_factory_build_setup (board_setup_t * const setup)
 
     else
     {
-        board_factory_build_unknown_setup(setup);
+        board_factory_build_T01_setup(setup);
+        //board_factory_build_unknown_setup(setup);
     }
 
     return;

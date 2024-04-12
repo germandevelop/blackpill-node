@@ -18,13 +18,14 @@
 
 typedef struct std_error std_error_t;
 
+typedef void (*ssd1306_display_lock_i2c_callback_t) ();
 typedef int (*ssd1306_display_i2c_callback_t) (uint16_t device_address, uint8_t *array, uint16_t array_size, uint32_t timeout_ms, std_error_t * const error);
-typedef int (*ssd1306_display_i2c_dma_callback_t) (uint16_t device_address, uint8_t *array, uint16_t array_size, std_error_t * const error);
 
 typedef struct ssd1306_display_config
 {
+    ssd1306_display_lock_i2c_callback_t lock_i2c_callback;
+    ssd1306_display_lock_i2c_callback_t unlock_i2c_callback;
     ssd1306_display_i2c_callback_t write_i2c_callback;
-    ssd1306_display_i2c_dma_callback_t write_i2c_dma_callback; // Optional (might be 'NULL')
     uint32_t i2c_timeout_ms;
 
     uint8_t *pixel_buffer;
@@ -36,7 +37,7 @@ typedef struct ssd1306_display ssd1306_display_t;
 
 
 int ssd1306_display_init (  ssd1306_display_t * const self,
-                            ssd1306_display_config_t const * const init_config,
+                            ssd1306_display_config_t const * const config,
                             std_error_t * const error);
 
 void ssd1306_display_reset_buffer (ssd1306_display_t * const self);

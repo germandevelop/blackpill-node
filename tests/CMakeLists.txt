@@ -26,7 +26,8 @@ target_sources(tests
 target_compile_options(tests
     PRIVATE
         -Wno-missing-field-initializers
-        #-Wno-c99-designator
+        -Wno-c99-designator
+        -Wno-strict-prototypes
 )
 target_compile_features(tests
     PRIVATE

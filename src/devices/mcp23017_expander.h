@@ -10,10 +10,13 @@
 
 typedef struct std_error std_error_t;
 
+typedef void (*mcp23017_expander_i2c_lock_callback_t) ();
 typedef int (*mcp23017_expander_i2c_callback_t) (uint16_t device_address, uint16_t register_address, uint16_t register_size, uint8_t *array, uint16_t array_size, uint32_t timeout_ms, std_error_t * const error);
 
 typedef struct mcp23017_expander_config
 {
+    mcp23017_expander_i2c_lock_callback_t i2c_lock_callback;
+    mcp23017_expander_i2c_lock_callback_t i2c_unlock_callback;
     mcp23017_expander_i2c_callback_t read_i2c_callback;
     mcp23017_expander_i2c_callback_t write_i2c_callback;
     uint32_t i2c_timeout_ms;
