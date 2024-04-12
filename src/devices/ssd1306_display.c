@@ -12,7 +12,7 @@
 #include "std_error/std_error.h"
 
 
-#define SET_DISPLAY_START_LINE_COMMAND 0x40
+#define SSD1306_DISPLAY_SET_START_LINE_COMMAND 0x40
 
 
 static void font10x16_draw_symbol (ssd1306_display_t * const self, uint8_t symbol, uint8_t X, uint8_t Y);
@@ -562,7 +562,7 @@ void font16x26_draw_pixel (ssd1306_display_t * const self, bool is_dark_pixel, u
 
 int ssd1306_display_update_full_screen (ssd1306_display_t * const self, std_error_t * const error)
 {
-    self->config.pixel_buffer[0] = SET_DISPLAY_START_LINE_COMMAND;
+    self->config.pixel_buffer[0] = SSD1306_DISPLAY_SET_START_LINE_COMMAND;
 
     self->config.lock_i2c_callback();
     int exit_code = self->config.write_i2c_callback(self->config.device_address, self->config.pixel_buffer, SSD1306_DISPLAY_PIXEL_BUFFER_SIZE, self->config.i2c_timeout_ms, error);

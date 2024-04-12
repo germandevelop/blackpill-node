@@ -59,6 +59,7 @@ void ssd1306_display_draw_text_16x26 (  ssd1306_display_t * const self,
 int ssd1306_display_update_full_screen (ssd1306_display_t * const self, std_error_t * const error);
 
 
+
 // Private
 typedef struct ssd1306_display
 {
