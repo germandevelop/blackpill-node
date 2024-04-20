@@ -9,6 +9,8 @@
 #include <stdint.h>
 
 typedef struct std_error std_error_t;
+
+typedef void (*w25q32bv_flash_spi_lock_callback_t) ();
 typedef void (*w25q32bv_flash_spi_select_callback_t) ();
 typedef int (*w25q32bv_flash_spi_tx_rx_callback_t) (uint8_t *tx_data, uint8_t *rx_data, uint16_t size,
                                                     uint32_t timeout_ms, std_error_t * const error);
@@ -16,6 +18,8 @@ typedef void (*w25q32bv_flash_delay_callback_t) (uint32_t delay_ms);
 
 typedef struct w25q32bv_flash_config
 {
+    w25q32bv_flash_spi_lock_callback_t spi_lock_callback;
+    w25q32bv_flash_spi_lock_callback_t spi_unlock_callback;
     w25q32bv_flash_spi_select_callback_t spi_select_callback;
     w25q32bv_flash_spi_select_callback_t spi_unselect_callback;
     w25q32bv_flash_spi_tx_rx_callback_t spi_tx_rx_callback;

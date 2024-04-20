@@ -7,7 +7,7 @@
 #define LFS_FILE_MAX 2147483647
 
 #define LFS_NO_MALLOC
-#define LFS_THREADSAFE
+//#define LFS_THREADSAFE
 //#define LFS_READONLY
 
 #ifdef NDEBUG

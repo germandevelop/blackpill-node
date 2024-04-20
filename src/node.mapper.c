@@ -12,6 +12,8 @@
 
 #include "lwjson/lwjson.h"
 
+#include "version.h"
+
 #include "std_error/std_error.h"
 
 
@@ -36,7 +38,11 @@ void node_mapper_serialize_message (node_msg_t const * const msg, char *raw_data
 
     int data_size = (-1);
 
-    if ((msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION))
+    if (msg->cmd_id == RESPONSE_VERSION)
+    {
+        data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"major\":%s,\"minor\":%s,\"patch\":%s}}\n", msg->header.source, dest_array, msg->cmd_id, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    }
+    else if ((msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION))
     {
         data_size = sprintf(raw_data, "{\"src_id\":%d,\"dst_id\":[%s],\"cmd_id\":%d,\"data\":{\"value_id\":%ld}}\n", msg->header.source, dest_array, msg->cmd_id, msg->value_0);
     }
@@ -116,7 +122,11 @@ int node_mapper_deserialize_message (const char *raw_data, node_msg_t * const ms
             msg->cmd_id = DO_NOTHING;
         }
 
-        if ((msg->cmd_id == SET_MODE) || (msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION) || (msg->cmd_id == SET_WARNING))
+        if ((msg->cmd_id == REQUEST_VERSION) || (msg->cmd_id == UPDATE_FIRMWARE))
+        {
+            // Do nothing
+        }
+        else if ((msg->cmd_id == SET_MODE) || (msg->cmd_id == SET_LIGHT) || (msg->cmd_id == SET_INTRUSION) || (msg->cmd_id == SET_WARNING))
         {
             is_token_parsed = ((token = lwjson_find(&lwjson, "data")) != NULL) && (token->type == LWJSON_TYPE_OBJECT);
 

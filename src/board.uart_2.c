@@ -10,7 +10,7 @@
 #include "std_error/std_error.h"
 
 
-#define UART_DEFAULT_ERROR_TEXT "UART_2 error"
+#define DEFAULT_ERROR_TEXT  "UART_2 error"
 
 
 static UART_HandleTypeDef uart_2_handler;
@@ -36,7 +36,7 @@ int board_uart_2_init (std_error_t * const error)
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, UART_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
@@ -49,7 +49,7 @@ int board_uart_2_deinit (std_error_t * const error)
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, UART_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
@@ -65,7 +65,7 @@ int board_uart_2_write (const uint8_t *data,
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, UART_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }

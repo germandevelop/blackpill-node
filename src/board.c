@@ -8,6 +8,8 @@
 #include <limits.h>
 #include <assert.h>
 
+#include "stm32f4xx_hal.h"
+
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
@@ -33,6 +35,7 @@
 #include "node.h"
 #include "node/node.list.h"
 #include "tcp_client.h"
+#include "tcp_client.type.h"
 
 #include "version.h"
 
@@ -40,7 +43,7 @@
 #include "std_error/std_error.h"
 
 
-#define RTOS_TASK_STACK_SIZE        512U    // 512*4=2048 bytes
+#define RTOS_TASK_STACK_SIZE        1024U   // 1024 * 4 = 4096 bytes
 #define RTOS_TASK_PRIORITY          4U      // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME              "board" // 16 - max length
 #define RTOS_TIMER_TICKS_TO_WAIT    100U
@@ -59,7 +62,6 @@
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
 
-#define UNUSED(x) (void)(x)
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 
@@ -78,6 +80,8 @@ static mcp23017_expander_t mcp23017_expander;
 static storage_t storage;
 static vs1838_control_t vs1838_control;
 static board_remote_button_t latest_remote_button;
+static storage_file_t firmware_file;
+static bool is_updating;
 
 
 static int board_malloc (std_error_t * const error);
@@ -88,6 +92,9 @@ static int board_set_status_led_color (board_led_color_t led_color, std_error_t 
 static void board_read_photoresistor (bool * const is_reading, std_error_t * const error);
 static void board_photoresistor_timer (TimerHandle_t timer);
 static void board_remote_control_ISR (uint32_t captured_value);
+
+static int board_receive_tcp_msg (tcp_msg_t const * const recv_msg, std_error_t * const error);
+static void board_receive_node_msg (node_msg_t const * const msg);
 
 static void board_init_logger ();
 static void board_init_status_led ();
@@ -123,6 +130,8 @@ void board_task (void *parameters)
 {
     UNUSED(parameters);
 
+    is_updating = false;
+    
     board_factory_build_setup(&setup);
 
     LOG("Board : unique id = %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
@@ -437,6 +446,79 @@ void board_remote_control_ISR (uint32_t captured_value)
     return;
 }
 
+int board_receive_tcp_msg (tcp_msg_t const * const recv_msg, std_error_t * const error)
+{
+    if (is_updating == true)
+    {
+        if (recv_msg->size != ARRAY_SIZE(recv_msg->data))
+        {
+            tcp_client_stop();
+
+            storage_write_file(&storage, &firmware_file, recv_msg->data, recv_msg->size, error);
+
+            size_t firmware_size;
+            storage_get_file_size(&storage, &firmware_file, &firmware_size, error);
+
+            LOG("Board [storage] : firmware size = %u bytes\r\n", firmware_size);
+
+            storage_close_file(&storage, &firmware_file, error);
+
+            storage_unmount_filesystem(&storage, error);
+            storage_disable_power(&storage, error);
+
+            vTaskDelay(pdMS_TO_TICKS(5U * 1000U));
+
+            HAL_NVIC_SystemReset();
+        }
+        else
+        {
+            storage_write_file(&storage, &firmware_file, recv_msg->data, recv_msg->size, error);
+        }
+    }
+    else
+    {
+        node_receive_tcp_msg(recv_msg, error);
+    }
+
+    return STD_SUCCESS;
+}
+
+
+void board_receive_node_msg (node_msg_t const * const msg)
+{
+    if (msg->cmd_id == UPDATE_FIRMWARE)
+    {
+        std_error_t error;
+        std_error_init(&error);
+
+        storage_enable_power(&storage, &error);
+        storage_mount_filesystem(&storage, &error);
+
+        const char file_name[64] = "firmware\0";
+        storage_create_file(&storage, &firmware_file, file_name, &error);
+
+        is_updating = true;
+
+        tcp_client_endpoint_t server;
+
+        server.ip[0] = node_ip_address[NODE_ADMIN][0];
+        server.ip[1] = node_ip_address[NODE_ADMIN][1];
+        server.ip[2] = node_ip_address[NODE_ADMIN][2];
+        server.ip[3] = node_ip_address[NODE_ADMIN][3];
+
+        server.port = admin_port;
+
+        tcp_client_restart(&server);
+    }
+    else
+    {
+        setup.process_msg_callback(msg);
+    }
+
+    return;
+}
+
+
 
 void board_init_logger ()
 {
@@ -607,7 +689,7 @@ void board_init_node ()
 
     node_config_t config;
     config.id                       = setup.node_id;
-    config.receive_msg_callback     = setup.process_msg_callback;
+    config.receive_msg_callback     = board_receive_node_msg;
     config.send_tcp_msg_callback    = tcp_client_send_message;
 
     if (node_init(&config, &error) != STD_SUCCESS)
@@ -638,7 +720,7 @@ void board_init_tcp_client ()
 
     tcp_client_config_t config = { 0 };
 
-    config.process_msg_callback = node_receive_tcp_msg;
+    config.process_msg_callback = board_receive_tcp_msg;
 
     config.spi_lock_callback        = board_spi_1_lock;
     config.spi_unlock_callback      = board_spi_1_unlock;
@@ -648,31 +730,33 @@ void board_init_tcp_client ()
     config.spi_write_callback       = board_spi_1_write;
     config.spi_timeout_ms           = SPI_TIMEOUT_MS;
 
-    config.mac_address[0] = 0xEA;
-    config.mac_address[1] = setup.unique_id[8];
-    config.mac_address[2] = setup.unique_id[9];
-    config.mac_address[3] = setup.unique_id[10];
-    config.mac_address[4] = setup.unique_id[11];
-    config.mac_address[5] = 0xEA;
+    config.mac[0] = 0xEA;
+    config.mac[1] = setup.unique_id[8];
+    config.mac[2] = setup.unique_id[9];
+    config.mac[3] = setup.unique_id[10];
+    config.mac[4] = setup.unique_id[11];
+    config.mac[5] = 0xEA;
 
-    config.ip_address[0] = 192;
-    config.ip_address[1] = 168;
-    config.ip_address[2] = 1;
-    config.ip_address[3] = 123;
+    config.ip[0] = node_ip_address[setup.node_id][0];
+    config.ip[1] = node_ip_address[setup.node_id][1];
+    config.ip[2] = node_ip_address[setup.node_id][2];
+    config.ip[3] = node_ip_address[setup.node_id][3];
 
-    config.netmask[0] = 255;
-    config.netmask[1] = 255;
-    config.netmask[2] = 255;
-    config.netmask[3] = 0;
+    config.netmask[0] = netmask[0];
+    config.netmask[1] = netmask[1];
+    config.netmask[2] = netmask[2];
+    config.netmask[3] = netmask[3];
 
-    config.server_ip[0] = 192;
-    config.server_ip[1] = 168;
-    config.server_ip[2] = 1;
-    config.server_ip[3] = 105;
+    tcp_client_endpoint_t server;
 
-    config.server_port = host_port;
+    server.ip[0] = server_ip_address[0];
+    server.ip[1] = server_ip_address[1];
+    server.ip[2] = server_ip_address[2];
+    server.ip[3] = server_ip_address[3];
 
-    if (tcp_client_init(&config, &error) != STD_SUCCESS)
+    server.port = server_port;
+
+    if (tcp_client_init(&config, &server, &error) != STD_SUCCESS)
     {
         LOG("Board [tcp_client] : %s\r\n", error.text);
     }

@@ -180,7 +180,43 @@ void node_task (void *parameters)
                 }
                 else
                 {
-                    config.receive_msg_callback(work_msg);
+                    if (work_msg->cmd_id == REQUEST_VERSION)
+                    {
+                        node_msg_t out_msg;
+
+                        size_t i = 0U;
+
+                        out_msg.header.source = config.id;
+                        out_msg.header.dest_array[i] = work_msg->header.source;
+                        ++i;
+                        out_msg.header.dest_array_size = i;
+
+                        out_msg.cmd_id = RESPONSE_VERSION;
+
+                        tcp_msg_t send_tcp_msg;
+
+                        node_mapper_serialize_message(&out_msg, send_tcp_msg.data, &send_tcp_msg.size);
+
+                        LOG("Node [tcp] : output msg = %s\r\n", send_tcp_msg.data);
+
+                        config.send_tcp_msg_callback(&send_tcp_msg);
+                    }
+                    else if (work_msg->cmd_id == UPDATE_FIRMWARE)
+                    {
+                        for (size_t i = 0U; i < work_msg->header.dest_array_size; ++i)
+                        {
+                            if (work_msg->header.dest_array[i] == config.id)
+                            {
+                                config.receive_msg_callback(work_msg);
+
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        config.receive_msg_callback(work_msg);
+                    }
                 }
 
                 xQueueSend(free_msg_queue, (const void*)&work_msg, RTOS_QUEUE_TICKS_TO_WAIT);

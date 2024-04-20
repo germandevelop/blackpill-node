@@ -242,6 +242,10 @@ target_sources(blackpill_bootloader
         src/storage.c
         src/board.uart_2.h
         src/board.uart_2.c
+        src/board.spi_1.h
+        src/board.spi_1.c
+        src/board.gpio_a.h
+        src/board.gpio_a.c
         src/logger.h
         src/logger.c
 
@@ -263,6 +267,9 @@ target_sources(blackpill_bootloader
         external/stm32_hal/Src/stm32f4xx_hal_gpio.c
         external/stm32_hal/Src/stm32f4xx_hal_uart.c
         external/stm32_hal/Src/stm32f4xx_hal_spi.c
+        external/stm32_hal/Src/stm32f4xx_hal_flash.c
+        external/stm32_hal/Src/stm32f4xx_hal_flash_ex.c
+        external/stm32_hal/Src/stm32f4xx_hal_flash_ramfunc.c
 
         external/little_fs/lfs_util.h
         external/little_fs/lfs.h
@@ -299,14 +306,10 @@ target_sources(blackpill_firmware
         src/board.type.h
         src/board.uart_2.h
         src/board.uart_2.c
-        src/board.spi_1.h
-        src/board.spi_1.c
         src/board.i2c_1.h
         src/board.i2c_1.c
         src/board.adc_1.h
         src/board.adc_1.c
-        src/board.gpio_a.h
-        src/board.gpio_a.c
         src/board.gpio_c.h
         src/board.gpio_c.c
         src/board.exti_1.h
@@ -358,9 +361,6 @@ target_sources(blackpill_firmware
         external/stm32_hal/Src/stm32f4xx_hal_i2c.c
         external/stm32_hal/Src/stm32f4xx_hal_i2c_ex.c
         external/stm32_hal/Src/stm32f4xx_hal_iwdg.c
-        external/stm32_hal/Src/stm32f4xx_hal_flash.c
-        external/stm32_hal/Src/stm32f4xx_hal_flash_ex.c
-        external/stm32_hal/Src/stm32f4xx_hal_flash_ramfunc.c
 
         external/free_rtos/tasks.c
         external/free_rtos/list.c
@@ -468,7 +468,7 @@ set_target_properties(silver_bootloader silver_firmware
 add_custom_target(silver
         dd if=${CMAKE_BINARY_DIR}/silver_bootloader.bin of=${CMAKE_BINARY_DIR}/silver.bin
     COMMAND
-        dd if=${CMAKE_BINARY_DIR}/silver_firmware.bin of=${CMAKE_BINARY_DIR}/silver.bin bs=4K seek=8
+        dd if=${CMAKE_BINARY_DIR}/silver_firmware.bin of=${CMAKE_BINARY_DIR}/silver.bin bs=64K seek=1
     DEPENDS
         silver_bootloader silver_firmware
 )
@@ -559,7 +559,7 @@ set_target_properties(gold_bootloader gold_firmware
 add_custom_target(gold
         dd if=${CMAKE_BINARY_DIR}/gold_bootloader.bin of=${CMAKE_BINARY_DIR}/gold.bin
     COMMAND
-        dd if=${CMAKE_BINARY_DIR}/gold_firmware.bin of=${CMAKE_BINARY_DIR}/gold.bin bs=4K seek=8
+        dd if=${CMAKE_BINARY_DIR}/gold_firmware.bin of=${CMAKE_BINARY_DIR}/gold.bin bs=64K seek=1
     DEPENDS
         gold_bootloader gold_firmware
 )

@@ -25,8 +25,10 @@
 #define RTOS_TASK_PRIORITY      3U              // 0 - lowest, 4 - highest
 #define RTOS_TASK_NAME          "tcp_client"    // 16 - max length
 
-#define SOCKET_INTERRUPT_NOTIFICATION   (1 << 0)
-#define SEND_MESSAGE_NOTIFICATION       (1 << 1)
+#define INITIALIZATION_NOTIFICATION     (1 << 0)
+#define SOCKET_INTERRUPT_NOTIFICATION   (1 << 1)
+#define SEND_MESSAGE_NOTIFICATION       (1 << 2)
+#define STOP_NOTIFICATION               (1 << 3)
 
 #define RECONNECTION_TIMEOUT_S 10U
 
@@ -49,8 +51,10 @@
 
 
 static TaskHandle_t task;
+static SemaphoreHandle_t endpoint_mutex;
 static SemaphoreHandle_t send_mutex;
 
+static tcp_client_endpoint_t endpoint;
 static tcp_client_config_t config;
 static tcp_msg_t *send_msg_buffer;
 static tcp_msg_t *recv_msg_buffer;
@@ -71,7 +75,7 @@ static void tcp_client_task (void *parameters);
 static int tcp_client_setup_w5500 (std_error_t * const error);
 static int tcp_client_connect (std_error_t * const error);
 
-int tcp_client_init (tcp_client_config_t const * const init_config, std_error_t * const error)
+int tcp_client_init (tcp_client_config_t const * const init_config, tcp_client_endpoint_t const * const server, std_error_t * const error)
 {
     assert(init_config                          != NULL);
     assert(init_config->process_msg_callback    != NULL);
@@ -83,6 +87,7 @@ int tcp_client_init (tcp_client_config_t const * const init_config, std_error_t 
     assert(init_config->spi_write_callback      != NULL);
 
     memcpy((void*)(&config), (const void*)(init_config), sizeof(tcp_client_config_t));
+    memcpy((void*)(&endpoint), (const void*)(server), sizeof(tcp_client_endpoint_t));
 
     return tcp_client_malloc(error);
 }
@@ -124,24 +129,10 @@ void tcp_client_task (void *parameters)
     std_error_t error;
     std_error_init(&error);
 
-    while (true)
-    {
-        if (tcp_client_setup_w5500(&error) != STD_SUCCESS)
-        {
-            LOG("TCP-Client : %s\r\n", error.text);
-
-            vTaskDelay(pdMS_TO_TICKS(5U * 1000U));
-        }
-        else
-        {
-            break;
-        }
-    }
-    vTaskDelay(pdMS_TO_TICKS(5U * 1000U));
-
     bool is_connected = false;
+    bool is_stoppped = false;
 
-    xTaskNotify(task, SOCKET_INTERRUPT_NOTIFICATION, eSetBits);
+    xTaskNotify(task, INITIALIZATION_NOTIFICATION, eSetBits);
 
     while (true)
     {
@@ -173,11 +164,11 @@ void tcp_client_task (void *parameters)
             uint8_t clear_interrupt = (uint8_t)(SIK_RECEIVED | SIK_DISCONNECTED);
             ctlsocket(W5500_SOCKET_NUMBER, CS_CLR_INTERRUPT, (void*)(&clear_interrupt));
 
-            LOG("TCP-Client : ISR - %u\r\n", interrupt_kind);
+            LOG("TCP-Client [ISR] : %u\r\n", interrupt_kind);
 
             if ((interrupt_kind & (uint8_t)(SIK_RECEIVED)) != 0U)
             {
-                LOG("TCP-Client : ISR - SIK_RECEIVED\r\n");
+                LOG("TCP-Client [ISR] : SIK_RECEIVED\r\n");
 
                 tcp_msg_t recv_msg = { .data = { '\0' }, .size = 0U };
 
@@ -200,7 +191,7 @@ void tcp_client_task (void *parameters)
 
             if ((interrupt_kind & (uint8_t)(SIK_DISCONNECTED)) != 0U)
             {
-                LOG("TCP-Client : ISR - SIK_DISCONNECTED\r\n");
+                LOG("TCP-Client [ISR] : SIK_DISCONNECTED\r\n");
 
                 is_connected = false;
 
@@ -210,34 +201,89 @@ void tcp_client_task (void *parameters)
             }
         }
 
-        const int8_t phy_link = wizphy_getphylink();
-
-        if (phy_link != PHY_LINK_ON)
+        if ((notification & INITIALIZATION_NOTIFICATION) != 0U)
         {
+            LOG("TCP-Client [w5500] : init\r\n");
+
             is_connected = false;
-        }
 
-        if (is_connected != true)
-        {
             while (true)
             {
-                if (tcp_client_connect(&error) != STD_SUCCESS)
+                if (tcp_client_setup_w5500(&error) != STD_SUCCESS)
                 {
-                    LOG("TCP-Client : Connection fail\r\n");
+                    LOG("TCP-Client [w5500] : %s\r\n", error.text);
 
-                    vTaskDelay(pdMS_TO_TICKS(RECONNECTION_TIMEOUT_S * 1000U));
+                    vTaskDelay(pdMS_TO_TICKS(3U * 1000U));
                 }
                 else
                 {
-                    LOG("TCP-Client : Connection success\r\n");
-
-                    is_connected = true;
-
                     break;
+                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(3U * 1000U));
+
+            xTaskNotify(task, SOCKET_INTERRUPT_NOTIFICATION, eSetBits);
+        }
+
+        if ((notification & STOP_NOTIFICATION) != 0U)
+        {
+            LOG("TCP-Client : stop\r\n");
+
+            is_stoppped = true;
+        }
+
+        // Check connection / Try to reconnect
+        if (is_stoppped == false)
+        {
+            const int8_t phy_link = wizphy_getphylink();
+
+            if (phy_link != PHY_LINK_ON)
+            {
+                is_connected = false;
+            }
+
+            if (is_connected != true)
+            {
+                while (true)
+                {
+                    if (tcp_client_connect(&error) != STD_SUCCESS)
+                    {
+                        LOG("TCP-Client : Connection fail\r\n");
+
+                        vTaskDelay(pdMS_TO_TICKS(RECONNECTION_TIMEOUT_S * 1000U));
+                    }
+                    else
+                    {
+                        LOG("TCP-Client : Connection success\r\n");
+
+                        is_connected = true;
+
+                        break;
+                    }
                 }
             }
         }
     }
+
+    return;
+}
+
+void tcp_client_restart (tcp_client_endpoint_t const * const server)
+{
+    xSemaphoreTake(endpoint_mutex, portMAX_DELAY);
+    memcpy((void*)(&endpoint), (const void*)(server), sizeof(tcp_client_endpoint_t));
+    xSemaphoreGive(endpoint_mutex);
+
+    xTaskNotify(task, INITIALIZATION_NOTIFICATION, eSetBits);
+
+    return;
+}
+
+void tcp_client_stop ()
+{
+    disconnect(W5500_SOCKET_NUMBER);
+
+    xTaskNotify(task, STOP_NOTIFICATION, eSetBits);
 
     return;
 }
@@ -281,7 +327,13 @@ int tcp_client_connect (std_error_t * const error)
 
     TCP_DEBUG("try to connect");
 
-    exit_code = connect(W5500_SOCKET_NUMBER, config.server_ip, config.server_port);
+    tcp_client_endpoint_t server;
+
+    xSemaphoreTake(endpoint_mutex, portMAX_DELAY);
+    memcpy((void*)(&server), (const void*)(&endpoint), sizeof(tcp_client_endpoint_t));
+    xSemaphoreGive(endpoint_mutex);
+
+    exit_code = connect(W5500_SOCKET_NUMBER, server.ip, server.port);
 
     if (exit_code != SOCK_OK)
     {
@@ -335,8 +387,8 @@ int tcp_client_setup_w5500 (std_error_t * const error)
     wizchip_settimeout(&timeout_config);
 
     wiz_NetInfo net_info;
-    memcpy((void*)(net_info.mac), (const void*)(config.mac_address), sizeof(net_info.mac));
-    memcpy((void*)(net_info.ip), (const void*)(config.ip_address), sizeof(net_info.ip));
+    memcpy((void*)(net_info.mac), (const void*)(config.mac), sizeof(net_info.mac));
+    memcpy((void*)(net_info.ip), (const void*)(config.ip), sizeof(net_info.ip));
     memcpy((void*)(net_info.sn), (const void*)(config.netmask), sizeof(net_info.sn));
     net_info.dhcp = NETINFO_STATIC;
 
@@ -359,14 +411,16 @@ int tcp_client_malloc (std_error_t * const error)
 
     const bool are_buffers_allocated = (send_msg_buffer != NULL) && (recv_msg_buffer != NULL);
 
-    send_mutex = xSemaphoreCreateMutex();
+    endpoint_mutex  = xSemaphoreCreateMutex();
+    send_mutex      = xSemaphoreCreateMutex();
 
-    const bool are_semaphores_allocated = (send_mutex != NULL);
+    const bool are_semaphores_allocated = (endpoint_mutex != NULL) && (send_mutex != NULL);
 
     if ((are_buffers_allocated != true) || (are_semaphores_allocated != true))
     {
         vPortFree((void*)send_msg_buffer);
         vPortFree((void*)recv_msg_buffer);
+        vSemaphoreDelete(endpoint_mutex);
         vSemaphoreDelete(send_mutex);
 
         std_error_catch_custom(error, STD_FAILURE, MALLOC_ERROR_TEXT, __FILE__, __LINE__);

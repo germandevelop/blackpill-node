@@ -10,7 +10,7 @@
 #include "std_error/std_error.h"
 
 
-#define SPI_DEFAULT_ERROR_TEXT  "SPI_1 error"
+#define DEFAULT_ERROR_TEXT  "SPI_1 error"
 
 
 static SPI_HandleTypeDef spi_1_handler;
@@ -41,7 +41,7 @@ int board_spi_1_init (std_error_t * const error)
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, SPI_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
@@ -78,7 +78,7 @@ int board_spi_1_read (uint8_t *data,
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, SPI_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
@@ -94,7 +94,7 @@ int board_spi_1_write (uint8_t *data,
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, SPI_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
@@ -111,7 +111,7 @@ int board_spi_1_read_write (uint8_t *tx_data,
 
     if (status != HAL_OK)
     {
-        std_error_catch_custom(error, (int)status, SPI_DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
+        std_error_catch_custom(error, (int)status, DEFAULT_ERROR_TEXT, __FILE__, __LINE__);
 
         return STD_FAILURE;
     }
