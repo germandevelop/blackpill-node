@@ -116,6 +116,9 @@ static void board_B02_disable_buzzer_power ();
 static void board_B02_enable_front_pir_power ();
 static void board_B02_disable_front_pir_power ();
 
+static void board_B02_i2c_1_lock_mock ();
+static void board_B02_i2c_1_unlock_mock ();
+
 static void board_B02_door_pir_ISR ();
 static void board_B02_front_pir_ISR ();
 static void board_B02_veranda_pir_ISR ();
@@ -693,7 +696,37 @@ void board_B02_draw_display (bool * const is_display_enabled, std_error_t * cons
         node_B02_get_display_data(node, &data, &disable_time_ms);
         xSemaphoreGive(node_mutex);
 
+        LOG("Board B02 [I2C_1] : reconfigure\r\n");
+
+        config.lock_i2c_1_callback();
+
+        {
+            board_i2c_1_deinit();
+
+            board_i2c_1_config_t config;
+            config.mapping = PORT_B_PIN_6_7;
+
+            if (board_i2c_1_init(&config, error) != STD_SUCCESS)
+            {
+                LOG("Board B02 [I2C_1] : %s\r\n", error->text);
+            }
+        }
+
         board_B02_draw_blue_display(&data, error);
+
+        {
+            board_i2c_1_deinit();
+
+            board_i2c_1_config_t config;
+            config.mapping = PORT_B_PIN_8_9;
+
+            if (board_i2c_1_init(&config, error) != STD_SUCCESS)
+            {
+                LOG("Board B02 [I2C_1] : %s\r\n", error->text);
+            }
+        }
+
+        config.unlock_i2c_1_callback();
 
         xTimerChangePeriod(display_timer, pdMS_TO_TICKS(disable_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
     }
@@ -746,8 +779,8 @@ void board_B02_draw_blue_display (node_B02_temperature_t const * const data, std
     uint8_t ssd1306_pixel_buffer[SSD1306_DISPLAY_PIXEL_BUFFER_SIZE];
 
     ssd1306_display_config_t display_config;
-    display_config.lock_i2c_callback    = config.lock_i2c_1_callback;
-    display_config.unlock_i2c_callback  = config.unlock_i2c_1_callback;
+    display_config.lock_i2c_callback    = board_B02_i2c_1_lock_mock;
+    display_config.unlock_i2c_callback  = board_B02_i2c_1_unlock_mock;
     display_config.write_i2c_callback   = board_i2c_1_write;
     display_config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
     display_config.pixel_buffer         = ssd1306_pixel_buffer;
@@ -966,6 +999,17 @@ void board_B02_disable_front_pir_power ()
 {
     LOG("Board B02 [front_pir] : disable power\r\n");
 
+    return;
+}
+
+
+void board_B02_i2c_1_lock_mock ()
+{
+    return;
+}
+
+void board_B02_i2c_1_unlock_mock ()
+{
     return;
 }
 

@@ -57,7 +57,7 @@
 #define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT    5U
-#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 60U * 1000U) // 1 min
+#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 10U * 1000U) // 1 min
 
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
@@ -578,7 +578,10 @@ void board_init_expander ()
 
     LOG("Board [I2C_1] : init\r\n");
 
-    if (board_i2c_1_init(&error) != STD_SUCCESS)
+    board_i2c_1_config_t i2c_config;
+    i2c_config.mapping = PORT_B_PIN_8_9;
+
+    if (board_i2c_1_init(&i2c_config, &error) != STD_SUCCESS)
     {
         LOG("Board [I2C_1] : %s\r\n", error.text);
     }

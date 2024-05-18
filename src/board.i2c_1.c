@@ -5,6 +5,8 @@
 
 #include "board.i2c_1.h"
 
+#include <assert.h>
+
 #include "stm32f4xx_hal.h"
 
 #include "std_error/std_error.h"
@@ -14,13 +16,18 @@
 
 
 static I2C_HandleTypeDef i2c_1_handler;
+static board_i2c_1_config_t config;
 
 
 static void board_i2c_1_msp_init (I2C_HandleTypeDef *i2c_handler);
 static void board_i2c_1_msp_deinit (I2C_HandleTypeDef *i2c_handler);
 
-int board_i2c_1_init (std_error_t * const error)
+int board_i2c_1_init (board_i2c_1_config_t const * const init_config, std_error_t * const error)
 {
+    assert(init_config != NULL);
+
+    config = *init_config;
+
     i2c_1_handler.Instance              = I2C1;
     i2c_1_handler.MspInitCallback       = board_i2c_1_msp_init;
     i2c_1_handler.MspDeInitCallback     = board_i2c_1_msp_deinit;
@@ -140,7 +147,16 @@ void board_i2c_1_msp_init (I2C_HandleTypeDef *i2c_handler)
     // PB8     ------> I2C1_SCL
     // PB9     ------> I2C1_SDA
     GPIO_InitTypeDef GPIO_InitStruct = { 0 };
-    GPIO_InitStruct.Pin         = GPIO_PIN_8 | GPIO_PIN_9;
+
+    if (config.mapping == PORT_B_PIN_6_7)
+    {
+        GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+    }
+    else
+    {
+        GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+    }
+
     GPIO_InitStruct.Mode        = GPIO_MODE_AF_OD;
     GPIO_InitStruct.Pull        = GPIO_NOPULL;
     GPIO_InitStruct.Speed       = GPIO_SPEED_FREQ_LOW;
@@ -167,7 +183,14 @@ void board_i2c_1_msp_deinit (I2C_HandleTypeDef *i2c_handler)
     // I2C1 GPIO Configuration
     // PB8     ------> I2C1_SCL
     // PB9     ------> I2C1_SDA
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8 | GPIO_PIN_9);
+    if (config.mapping == PORT_B_PIN_6_7)
+    {
+        HAL_GPIO_DeInit(GPIOB, GPIO_PIN_6 | GPIO_PIN_7);
+    }
+    else
+    {
+        HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8 | GPIO_PIN_9);
+    }
 
     // I2C1 interrupt DeInit
     //HAL_NVIC_DisableIRQ(I2C1_EV_IRQn);

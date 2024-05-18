@@ -15,6 +15,7 @@
 #include "semphr.h"
 #include "timers.h"
 
+#include "board.exti_15_10.h"
 #include "board.i2c_1.h"
 
 #include "devices/mcp23017_expander.h"
@@ -85,16 +86,21 @@ static void board_T01_humidity_timer (TimerHandle_t timer);
 static void board_T01_read_reed_switch ();
 static void board_T01_reed_switch_timer (TimerHandle_t timer);
 
-static void board_T01_enable_display_power ();
-static void board_T01_disable_display_power ();
-static void board_T01_enable_light_power ();
-static void board_T01_disable_light_power ();
-static void board_T01_enable_warning_led_power ();
-static void board_T01_disable_warning_led_power ();
+static void board_T01_enable_display_power (std_error_t * const error);
+static void board_T01_disable_display_power (std_error_t * const error);
+static void board_T01_enable_light_power (std_error_t * const error);
+static void board_T01_disable_light_power (std_error_t * const error);
+static void board_T01_enable_warning_led_power (std_error_t * const error);
+static void board_T01_disable_warning_led_power (std_error_t * const error);
+
+static void board_T01_i2c_1_lock_mock ();
+static void board_T01_i2c_1_unlock_mock ();
 
 static void board_T01_pir_ISR ();
+static void board_T01_reed_switch_ISR ();
 
-static void board_B02_init_humidity_sensor ();
+static void board_T01_init_humidity_sensor ();
+static void board_T01_init_pir_and_reed_switch ();
 
 int board_T01_init (board_extension_config_t const * const init_config, std_error_t * const error)
 {
@@ -121,10 +127,13 @@ void board_T01_task (void *parameters)
     UNUSED(parameters);
 
     node_T01_init(node);
-    board_B02_init_humidity_sensor();
+    board_T01_init_humidity_sensor();
+    board_T01_init_pir_and_reed_switch();
 
     std_error_t error;
     std_error_init(&error);
+
+    board_T01_disable_warning_led_power(&error);
 
     bool is_lightning_blocked   = false;
     bool is_light_enabled       = false;
@@ -165,9 +174,9 @@ void board_T01_task (void *parameters)
                 is_warning_led_enabled  = false;
                 is_display_enabled      = false;
 
-                board_T01_disable_light_power();
-                board_T01_disable_warning_led_power();
-                board_T01_disable_display_power();
+                board_T01_disable_light_power(&error);
+                board_T01_disable_warning_led_power(&error);
+                board_T01_disable_display_power(&error);
             }
         }
 
@@ -181,14 +190,14 @@ void board_T01_task (void *parameters)
             if (is_light_enabled == false)
             {
                 is_light_enabled = true;
-                board_T01_enable_light_power();
+                board_T01_enable_light_power(&error);
 
                 xTimerChangePeriod(light_timer, pdMS_TO_TICKS(NODE_T01_LIGHT_DURATION_MS), RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
                 is_light_enabled = false;
-                board_T01_disable_light_power();
+                board_T01_disable_light_power(&error);
             }
         }
 
@@ -200,13 +209,13 @@ void board_T01_task (void *parameters)
 
                 if (is_even == true)
                 {
-                    board_T01_enable_warning_led_power();
+                    board_T01_enable_warning_led_power(&error);
 
                     xTimerChangePeriod(warning_led_timer, pdMS_TO_TICKS(3U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
                 }
                 else
                 {
-                    board_T01_disable_warning_led_power();
+                    board_T01_disable_warning_led_power(&error);
 
                     xTimerChangePeriod(warning_led_timer, pdMS_TO_TICKS(1U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
                 }
@@ -215,7 +224,7 @@ void board_T01_task (void *parameters)
             }
             else
             {
-                board_T01_disable_warning_led_power();
+                board_T01_disable_warning_led_power(&error);
             }
         }
 
@@ -329,10 +338,10 @@ void board_T01_process_photoresistor_data (photoresistor_data_t const * const da
     assert(data         != NULL);
     assert(next_time_ms != NULL);
 
-    const float gamma                   = 0.60F;        // Probably it does not work
-    const float one_lux_resistance_Ohm  = 200000.0F;    // Probably it does not work
+    const float gamma                   = 1.7F;
+    const float one_lux_resistance_Ohm  = 200000.0F;
 
-    const float lux = pow(10.0F, (log10(one_lux_resistance_Ohm / (float)(data->resistance_Ohm)) / gamma));  // Probably it does not work
+    const float lux = pow(10.0F, (log10(one_lux_resistance_Ohm / (float)(data->resistance_Ohm)) / gamma));
 
     LOG("Board T01 [photoresistor] : luminosity = %.2f lux\r\n", lux);
 
@@ -422,7 +431,7 @@ void board_T01_draw_display (bool * const is_display_enabled, std_error_t * cons
         stage = DRAW_DATA;
 
         *is_display_enabled = true;
-        board_T01_enable_display_power();
+        board_T01_enable_display_power(error);
 
         xTimerChangePeriod(display_timer, pdMS_TO_TICKS(1U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
     }
@@ -438,8 +447,38 @@ void board_T01_draw_display (bool * const is_display_enabled, std_error_t * cons
         node_T01_get_display_data(node, &data, &disable_time_ms);
         xSemaphoreGive(node_mutex);
 
+        LOG("Board T01 [I2C_1] : reconfigure\r\n");
+
+        config.lock_i2c_1_callback();
+
+        {
+            board_i2c_1_deinit();
+
+            board_i2c_1_config_t config;
+            config.mapping = PORT_B_PIN_6_7;
+
+            if (board_i2c_1_init(&config, error) != STD_SUCCESS)
+            {
+                LOG("Board T01 [I2C_1] : %s\r\n", error->text);
+            }
+        }
+
         board_T01_draw_yellow_display(&data, error);
         board_T01_draw_blue_display(&data, error);
+
+        {
+            board_i2c_1_deinit();
+
+            board_i2c_1_config_t config;
+            config.mapping = PORT_B_PIN_8_9;
+
+            if (board_i2c_1_init(&config, error) != STD_SUCCESS)
+            {
+                LOG("Board T01 [I2C_1] : %s\r\n", error->text);
+            }
+        }
+
+        config.unlock_i2c_1_callback();
 
         xTimerChangePeriod(display_timer, pdMS_TO_TICKS(disable_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
     }
@@ -449,7 +488,7 @@ void board_T01_draw_display (bool * const is_display_enabled, std_error_t * cons
         stage = ENABLE_POWER;
 
         *is_display_enabled = false;
-        board_T01_disable_display_power();
+        board_T01_disable_display_power(error);
     }
 
     return;
@@ -490,8 +529,8 @@ void board_T01_draw_blue_display (node_T01_humidity_t const * const data, std_er
     uint8_t ssd1306_pixel_buffer[SSD1306_DISPLAY_PIXEL_BUFFER_SIZE];
 
     ssd1306_display_config_t display_config;
-    display_config.lock_i2c_callback    = config.lock_i2c_1_callback;
-    display_config.unlock_i2c_callback  = config.unlock_i2c_1_callback;
+    display_config.lock_i2c_callback    = board_T01_i2c_1_lock_mock;
+    display_config.unlock_i2c_callback  = board_T01_i2c_1_unlock_mock;
     display_config.write_i2c_callback   = board_i2c_1_write;
     display_config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
     display_config.pixel_buffer         = ssd1306_pixel_buffer;
@@ -574,8 +613,8 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data, std_
     uint8_t ssd1306_pixel_buffer[SSD1306_DISPLAY_PIXEL_BUFFER_SIZE];
 
     ssd1306_display_config_t display_config;
-    display_config.lock_i2c_callback    = config.lock_i2c_1_callback;
-    display_config.unlock_i2c_callback  = config.unlock_i2c_1_callback;
+    display_config.lock_i2c_callback    = board_T01_i2c_1_lock_mock;
+    display_config.unlock_i2c_callback  = board_T01_i2c_1_unlock_mock;
     display_config.write_i2c_callback   = board_i2c_1_write;
     display_config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
     display_config.pixel_buffer         = ssd1306_pixel_buffer;
@@ -677,15 +716,21 @@ void board_T01_read_reed_switch ()
 {
     LOG("Board T01 [reed_switch] : read\r\n");
 
-    // **************************************
-    // Read state
-    bool is_reed_switch_open = false;
-    // **************************************
+    bool is_high;
+    board_exti_15_10_get_12(&is_high);
 
-    bool is_door_open = false;
+    bool is_door_open;
 
-    if (is_reed_switch_open == true)
+    if (is_high == true)
     {
+        LOG("Board T01 [reed_switch] : high\r\n");
+
+        is_door_open = false;
+    }
+    else
+    {
+        LOG("Board T01 [reed_switch] : low\r\n");
+
         is_door_open = true;
     }
 
@@ -710,45 +755,86 @@ void board_T01_reed_switch_timer (TimerHandle_t timer)
 }
 
 
-void board_T01_enable_display_power ()
+void board_T01_enable_display_power (std_error_t * const error)
 {
     LOG("Board T01 [display] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_7, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board T01 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_T01_disable_display_power ()
+void board_T01_disable_display_power (std_error_t * const error)
 {
     LOG("Board T01 [display] : disable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_7, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board T01 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_T01_enable_light_power ()
+void board_T01_enable_light_power (std_error_t * const error)
 {
     LOG("Board T01 [light] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_6, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board T01 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_T01_disable_light_power ()
+void board_T01_disable_light_power (std_error_t * const error)
 {
     LOG("Board T01 [light] : disable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_6, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board T01 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_T01_enable_warning_led_power ()
+void board_T01_enable_warning_led_power (std_error_t * const error)
 {
     LOG("Board T01 [warning_led] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_5, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board T01 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_T01_disable_warning_led_power ()
+void board_T01_disable_warning_led_power (std_error_t * const error)
 {
     LOG("Board T01 [warning_led] : disable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_5, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board T01 [expander] : %s\r\n", error->text);
+    }
+
+    return;
+}
+
+
+void board_T01_i2c_1_lock_mock ()
+{
+    return;
+}
+
+void board_T01_i2c_1_unlock_mock ()
+{
     return;
 }
 
@@ -772,8 +858,27 @@ void board_T01_pir_ISR ()
     return;
 }
 
+void board_T01_reed_switch_ISR ()
+{
+    static TickType_t last_tick_count_ms = 0U;
 
-void board_B02_init_humidity_sensor ()
+    const TickType_t tick_count_ms = xTaskGetTickCountFromISR();
+
+    if ((tick_count_ms - last_tick_count_ms) > PIR_HYSTERESIS_MS)
+    {
+        last_tick_count_ms = tick_count_ms;
+
+        BaseType_t is_higher_priority_task_woken;
+        xTaskNotifyFromISR(task, REED_SWITCH_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
+
+        portYIELD_FROM_ISR(is_higher_priority_task_woken);
+    }
+
+    return;
+}
+
+
+void board_T01_init_humidity_sensor ()
 {
     LOG("Board T01 [bme280] : init\r\n");
 
@@ -791,6 +896,28 @@ void board_B02_init_humidity_sensor ()
     if (bme280_sensor_init(&sensor_config, &error) != STD_SUCCESS)
     {
         LOG("Board T01 [bme280] : %s\r\n", error.text);
+    }
+
+    return;
+}
+
+void board_T01_init_pir_and_reed_switch ()
+{
+    LOG("Board T01 [pir] : init\r\n");
+    LOG("Board T01 [reed_switch] : init\r\n");
+
+    std_error_t error;
+    std_error_init(&error);
+
+    LOG("Board [EXTI_15_10] : init\r\n");
+
+    board_exti_15_10_config_t exti_config;
+    exti_config.exti_12_callback = board_T01_reed_switch_ISR;
+    exti_config.exti_15_callback = board_T01_pir_ISR;
+
+    if (board_exti_15_10_init(&exti_config, &error) != STD_SUCCESS)
+    {
+        LOG("Board [EXTI_15_10] : %s\r\n", error.text);
     }
 
     return;

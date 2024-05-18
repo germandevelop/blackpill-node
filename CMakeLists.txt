@@ -316,6 +316,8 @@ target_sources(blackpill_firmware
         src/board.exti_1.c
         src/board.exti_2.h
         src/board.exti_2.c
+        src/board.exti_15_10.h
+        src/board.exti_15_10.c
         src/board.timer_2.h
         src/board.timer_2.c
         src/board.timer_3.h

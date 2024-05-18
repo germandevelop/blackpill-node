@@ -10,7 +10,20 @@
 
 typedef struct std_error std_error_t;
 
-int board_i2c_1_init (std_error_t * const error);
+typedef enum board_i2c_1_mapping
+{
+    PORT_B_PIN_8_9 = 0,
+    PORT_B_PIN_6_7
+
+} board_i2c_1_mapping_t;
+
+typedef struct board_i2c_1_config
+{
+    board_i2c_1_mapping_t mapping;
+
+} board_i2c_1_config_t;
+
+int board_i2c_1_init (board_i2c_1_config_t const * const init_config, std_error_t * const error);
 void board_i2c_1_deinit ();
 
 void board_i2c_1_enable_clock ();
