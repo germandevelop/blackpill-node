@@ -15,6 +15,8 @@
 #include "semphr.h"
 #include "timers.h"
 
+#include "board.exti_2.h"
+#include "board.exti_15_10.h"
 #include "board.i2c_1.h"
 
 #include "devices/mcp23017_expander.h"
@@ -97,33 +99,31 @@ static void board_B02_display_timer (TimerHandle_t timer);
 static void board_B02_read_temperature_data (std_error_t * const error);
 static void board_B02_temperature_timer (TimerHandle_t timer);
 
-static void board_B02_enable_display_power ();
-static void board_B02_disable_display_power ();
-static void board_B02_enable_veranda_light_power ();
-static void board_B02_disable_veranda_light_power ();
-static void board_B02_enable_front_light_power ();
-static void board_B02_disable_front_light_power ();
-static void board_B02_enable_light_strip_white_power ();
-static void board_B02_disable_light_strip_white_power ();
-static void board_B02_enable_light_strip_green_power ();
-static void board_B02_disable_light_strip_green_power ();
-static void board_B02_enable_light_strip_blue_power ();
-static void board_B02_disable_light_strip_blue_power ();
-static void board_B02_enable_light_strip_red_power ();
-static void board_B02_disable_light_strip_red_power ();
-static void board_B02_enable_buzzer_power ();
-static void board_B02_disable_buzzer_power ();
-static void board_B02_enable_front_pir_power ();
-static void board_B02_disable_front_pir_power ();
-
-static void board_B02_i2c_1_lock_mock ();
-static void board_B02_i2c_1_unlock_mock ();
+static void board_B02_enable_display_power (std_error_t * const error);
+static void board_B02_disable_display_power (std_error_t * const error);
+static void board_B02_enable_veranda_light_power (std_error_t * const error);
+static void board_B02_disable_veranda_light_power (std_error_t * const error);
+static void board_B02_enable_front_light_power (std_error_t * const error);
+static void board_B02_disable_front_light_power (std_error_t * const error);
+static void board_B02_enable_light_strip_white_power (std_error_t * const error);
+static void board_B02_disable_light_strip_white_power (std_error_t * const error);
+static void board_B02_enable_light_strip_green_power (std_error_t * const error);
+static void board_B02_disable_light_strip_green_power (std_error_t * const error);
+static void board_B02_enable_light_strip_blue_power (std_error_t * const error);
+static void board_B02_disable_light_strip_blue_power (std_error_t * const error);
+static void board_B02_enable_light_strip_red_power (std_error_t * const error);
+static void board_B02_disable_light_strip_red_power (std_error_t * const error);
+static void board_B02_enable_buzzer_power (std_error_t * const error);
+static void board_B02_disable_buzzer_power (std_error_t * const error);
+static void board_B02_enable_front_pir_power (std_error_t * const error);
+static void board_B02_disable_front_pir_power (std_error_t * const error);
 
 static void board_B02_door_pir_ISR ();
 static void board_B02_front_pir_ISR ();
 static void board_B02_veranda_pir_ISR ();
 
 static void board_B02_init_temperature_sensor ();
+static void board_B02_init_pir ();
 
 int board_B02_init (board_extension_config_t const * const init_config, std_error_t * const error)
 {
@@ -151,6 +151,7 @@ void board_B02_task (void *parameters)
 
     node_B02_init(node);
     board_B02_init_temperature_sensor();
+    board_B02_init_pir();
 
     std_error_t error;
     std_error_init(&error);
@@ -187,11 +188,26 @@ void board_B02_task (void *parameters)
 
         if ((notification & FRONT_PIR_NOTIFICATION) != 0U)
         {
-            LOG("Board B02 [front_pir] : movement\r\n");
+            uint8_t port_capture;
 
-            xSemaphoreTake(node_mutex, portMAX_DELAY);
-            node_B02_process_front_movement(node, tick_count_ms);
-            xSemaphoreGive(node_mutex);
+            if (mcp23017_expander_get_int_capture(config.mcp23017_expander, PORT_A, &port_capture, &error) != STD_SUCCESS)
+            {
+                LOG("Board B02 [expander] : %s\r\n", error.text);
+            }
+
+            if (mcp23017_expander_get_int_capture(config.mcp23017_expander, PORT_B, &port_capture, &error) != STD_SUCCESS)
+            {
+                LOG("Board B02 [expander] : %s\r\n", error.text);
+            }
+
+            if ((port_capture & (1 << PIN_6)) != 0U)
+            {
+                LOG("Board B02 [front_pir] : movement\r\n");
+
+                xSemaphoreTake(node_mutex, portMAX_DELAY);
+                node_B02_process_front_movement(node, tick_count_ms);
+                xSemaphoreGive(node_mutex);
+            }
         }
 
         if ((notification & VERANDA_PIR_NOTIFICATION) != 0U)
@@ -223,13 +239,13 @@ void board_B02_task (void *parameters)
                 is_light_strip_red_enabled      = false;
                 is_display_enabled              = false;
 
-                board_B02_disable_front_light_power();
-                board_B02_disable_veranda_light_power();
-                board_B02_disable_light_strip_white_power();
-                board_B02_disable_light_strip_green_power();
-                board_B02_disable_light_strip_blue_power();
-                board_B02_disable_light_strip_red_power();
-                board_B02_disable_display_power();
+                board_B02_disable_front_light_power(&error);
+                board_B02_disable_veranda_light_power(&error);
+                board_B02_disable_light_strip_white_power(&error);
+                board_B02_disable_light_strip_green_power(&error);
+                board_B02_disable_light_strip_blue_power(&error);
+                board_B02_disable_light_strip_red_power(&error);
+                board_B02_disable_display_power(&error);
             }
         }
 
@@ -243,14 +259,14 @@ void board_B02_task (void *parameters)
             if (is_front_light_enabled == false)
             {
                 is_front_light_enabled = true;
-                board_B02_enable_front_light_power();
+                board_B02_enable_front_light_power(&error);
 
                 xTimerChangePeriod(front_light_timer, pdMS_TO_TICKS(NODE_B02_LIGHT_DURATION_MS), RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
                 is_front_light_enabled = false;
-                board_B02_disable_front_light_power();
+                board_B02_disable_front_light_power(&error);
             }
         }
 
@@ -259,14 +275,14 @@ void board_B02_task (void *parameters)
             if (is_veranda_light_enabled == false)
             {
                 is_veranda_light_enabled = true;
-                board_B02_enable_veranda_light_power();
+                board_B02_enable_veranda_light_power(&error);
 
                 xTimerChangePeriod(veranda_light_timer, pdMS_TO_TICKS(NODE_B02_LIGHT_DURATION_MS), RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
                 is_veranda_light_enabled = false;
-                board_B02_disable_veranda_light_power();
+                board_B02_disable_veranda_light_power(&error);
             }
         }
 
@@ -275,43 +291,50 @@ void board_B02_task (void *parameters)
             if (is_light_strip_white_enabled == false)
             {
                 is_light_strip_white_enabled = true;
-                board_B02_enable_light_strip_white_power();
+                board_B02_enable_light_strip_white_power(&error);
 
                 xTimerChangePeriod(light_strip_white_timer, pdMS_TO_TICKS(NODE_B02_LIGHT_DURATION_MS), RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
                 is_light_strip_white_enabled = false;
-                board_B02_disable_light_strip_white_power();
+                board_B02_disable_light_strip_white_power(&error);
             }
         }
 
         if ((notification & LIGHT_STRIP_GREEN_BLUE_NOTIFICATION) != 0U)
         {
-            if (light_strip_green_blue_counter > NODE_B02_LIGHT_DURATION_MS)
+            if (light_strip_green_blue_counter > (NODE_B02_LIGHT_DURATION_MS / 1000U))
             {
                 light_strip_green_blue_counter = 0U;
-                board_B02_disable_light_strip_green_power();
-                board_B02_disable_light_strip_blue_power();
+                board_B02_disable_light_strip_green_power(&error);
+                board_B02_disable_light_strip_blue_power(&error);
             }
             else
             {
                 ++light_strip_green_blue_counter;
 
-                if (is_light_strip_green_enabled == false)
+                if (light_strip_green_blue_counter > (NODE_B02_LIGHT_DURATION_MS / 4000U))
                 {
-                    is_light_strip_green_enabled = true;
-                    board_B02_enable_light_strip_green_power();
-                    board_B02_disable_light_strip_blue_power();
+                    if (is_light_strip_green_enabled == false)
+                    {
+                        is_light_strip_green_enabled = true;
+                        board_B02_enable_light_strip_green_power(&error);
+                        board_B02_disable_light_strip_blue_power(&error);
 
-                    xTimerChangePeriod(light_strip_green_blue_timer, pdMS_TO_TICKS(2U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
+                        xTimerChangePeriod(light_strip_green_blue_timer, pdMS_TO_TICKS(2U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
+                    }
+                    else
+                    {
+                        is_light_strip_green_enabled = false;
+                        board_B02_enable_light_strip_blue_power(&error);
+                        board_B02_disable_light_strip_green_power(&error);
+
+                        xTimerChangePeriod(light_strip_green_blue_timer, pdMS_TO_TICKS(2U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
+                    }
                 }
                 else
                 {
-                    is_light_strip_green_enabled = false;
-                    board_B02_enable_light_strip_blue_power();
-                    board_B02_disable_light_strip_green_power();
-
                     xTimerChangePeriod(light_strip_green_blue_timer, pdMS_TO_TICKS(2U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
                 }
             }
@@ -325,13 +348,13 @@ void board_B02_task (void *parameters)
 
                 if (is_even == true)
                 {
-                    board_B02_enable_light_strip_red_power();
+                    board_B02_enable_light_strip_red_power(&error);
 
                     xTimerChangePeriod(light_strip_red_timer, pdMS_TO_TICKS(3U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
                 }
                 else
                 {
-                    board_B02_disable_light_strip_red_power();
+                    board_B02_disable_light_strip_red_power(&error);
 
                     xTimerChangePeriod(light_strip_red_timer, pdMS_TO_TICKS(1U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
                 }
@@ -340,7 +363,7 @@ void board_B02_task (void *parameters)
             }
             else
             {
-                board_B02_disable_light_strip_red_power();
+                board_B02_disable_light_strip_red_power(&error);
             }
         }
 
@@ -354,14 +377,14 @@ void board_B02_task (void *parameters)
             if (is_buzzer_enabled == false)
             {
                 is_buzzer_enabled = true;
-                board_B02_enable_buzzer_power();
+                board_B02_enable_buzzer_power(&error);
 
                 xTimerChangePeriod(buzzer_timer, pdMS_TO_TICKS(NODE_B02_BUZZER_DURATION_MS), RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
                 is_buzzer_enabled = false;
-                board_B02_disable_buzzer_power();
+                board_B02_disable_buzzer_power(&error);
             }
         }
 
@@ -372,26 +395,48 @@ void board_B02_task (void *parameters)
 
         if ((notification & FRONT_PIR_POWER_NOTIFICATION) != 0U)
         {
-            if (is_front_light_enabled == false)
+            if (is_front_pir_enabled == false)
             {
-                is_front_light_enabled = true;
-                board_B02_enable_front_pir_power();
+                is_front_pir_enabled = true;
+                board_B02_enable_front_pir_power(&error);
 
-                xTimerChangePeriod(front_pir_timer, pdMS_TO_TICKS(3U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
+                xTimerChangePeriod(front_pir_timer, pdMS_TO_TICKS(5U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
             }
             else
             {
-                is_front_light_enabled = false;
-                // Disable EXTI
-                board_B02_disable_front_pir_power();
+                is_front_pir_enabled = false;
+
+                if (board_exti_2_deinit(&error) != STD_SUCCESS)
+                {
+                    LOG("Board B02 [EXTI_2] : %s\r\n", error.text);
+                }
+
+                board_B02_disable_front_pir_power(&error);
             }
         }
 
         if ((notification & FRONT_PIR_CONFIG_NOTIFICATION) != 0U)
         {
-            if (is_front_light_enabled == true)
+            if (is_front_pir_enabled == true)
             {
-                // Enable EXTI
+                uint8_t port_capture;
+
+                if (mcp23017_expander_get_int_capture(config.mcp23017_expander, PORT_A, &port_capture, &error) != STD_SUCCESS)
+                {
+                    LOG("Board B02 [expander] : %s\r\n", error.text);
+                }
+
+                if (mcp23017_expander_get_int_capture(config.mcp23017_expander, PORT_B, &port_capture, &error) != STD_SUCCESS)
+                {
+                    LOG("Board B02 [expander] : %s\r\n", error.text);
+                }
+
+                LOG("Board B02 [EXTI_2] : init\r\n");
+
+                if (board_exti_2_init(board_B02_front_pir_ISR, &error) != STD_SUCCESS)
+                {
+                    LOG("Board B02 [EXTI_2] : %s\r\n", error.text);
+                }
             }
         }
 
@@ -507,14 +552,14 @@ void board_B02_task (void *parameters)
             {
                 if (is_front_pir_enabled == false)
                 {
-                    xTaskNotify(task, LIGHT_STRIP_GREEN_BLUE_NOTIFICATION, eSetBits);
+                    xTaskNotify(task, FRONT_PIR_POWER_NOTIFICATION, eSetBits);
                 }
             }
             else
             {
                 if (is_front_pir_enabled == true)
                 {
-                    xTaskNotify(task, LIGHT_STRIP_GREEN_BLUE_NOTIFICATION, eSetBits);
+                    xTaskNotify(task, FRONT_PIR_POWER_NOTIFICATION, eSetBits);
                 }
             }
         }
@@ -680,7 +725,7 @@ void board_B02_draw_display (bool * const is_display_enabled, std_error_t * cons
         stage = DRAW_DATA;
 
         *is_display_enabled = true;
-        board_B02_enable_display_power();
+        board_B02_enable_display_power(error);
 
         xTimerChangePeriod(display_timer, pdMS_TO_TICKS(1U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
     }
@@ -696,37 +741,7 @@ void board_B02_draw_display (bool * const is_display_enabled, std_error_t * cons
         node_B02_get_display_data(node, &data, &disable_time_ms);
         xSemaphoreGive(node_mutex);
 
-        LOG("Board B02 [I2C_1] : reconfigure\r\n");
-
-        config.lock_i2c_1_callback();
-
-        {
-            board_i2c_1_deinit();
-
-            board_i2c_1_config_t config;
-            config.mapping = PORT_B_PIN_6_7;
-
-            if (board_i2c_1_init(&config, error) != STD_SUCCESS)
-            {
-                LOG("Board B02 [I2C_1] : %s\r\n", error->text);
-            }
-        }
-
         board_B02_draw_blue_display(&data, error);
-
-        {
-            board_i2c_1_deinit();
-
-            board_i2c_1_config_t config;
-            config.mapping = PORT_B_PIN_8_9;
-
-            if (board_i2c_1_init(&config, error) != STD_SUCCESS)
-            {
-                LOG("Board B02 [I2C_1] : %s\r\n", error->text);
-            }
-        }
-
-        config.unlock_i2c_1_callback();
 
         xTimerChangePeriod(display_timer, pdMS_TO_TICKS(disable_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
     }
@@ -736,7 +751,7 @@ void board_B02_draw_display (bool * const is_display_enabled, std_error_t * cons
         stage = ENABLE_POWER;
 
         *is_display_enabled = false;
-        board_B02_disable_display_power();
+        board_B02_disable_display_power(error);
     }
 
     return;
@@ -779,12 +794,12 @@ void board_B02_draw_blue_display (node_B02_temperature_t const * const data, std
     uint8_t ssd1306_pixel_buffer[SSD1306_DISPLAY_PIXEL_BUFFER_SIZE];
 
     ssd1306_display_config_t display_config;
-    display_config.lock_i2c_callback    = board_B02_i2c_1_lock_mock;
-    display_config.unlock_i2c_callback  = board_B02_i2c_1_unlock_mock;
+    display_config.lock_i2c_callback    = config.lock_i2c_1_callback;
+    display_config.unlock_i2c_callback  = config.unlock_i2c_1_callback;
     display_config.write_i2c_callback   = board_i2c_1_write;
     display_config.i2c_timeout_ms       = I2C_TIMEOUT_MS;
     display_config.pixel_buffer         = ssd1306_pixel_buffer;
-    display_config.device_address       = SSD1306_DISPLAY_ADDRESS_2;
+    display_config.device_address       = SSD1306_DISPLAY_ADDRESS_1;
 
     ssd1306_display_t ssd1306_display;
 
@@ -876,140 +891,196 @@ void board_B02_temperature_timer (TimerHandle_t timer)
 }
 
 
-void board_B02_enable_display_power ()
+void board_B02_enable_display_power (std_error_t * const error)
 {
     LOG("Board B02 [display] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_3, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_B02_disable_display_power ()
+void board_B02_disable_display_power (std_error_t * const error)
 {
     LOG("Board B02 [display] : disable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_3, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_B02_enable_veranda_light_power ()
+void board_B02_enable_veranda_light_power (std_error_t * const error)
 {
     LOG("Board B02 [veranda_light] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_2, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_B02_disable_veranda_light_power ()
+void board_B02_disable_veranda_light_power (std_error_t * const error)
 {
     LOG("Board B02 [veranda_light] : disable power\r\n");
 
-    return;
-}
-
-void board_B02_enable_front_light_power ()
-{
-    LOG("Board B02 [front_light] : enable power\r\n");
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_2, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
     return;
 }
 
-void board_B02_disable_front_light_power ()
-{
-    LOG("Board B02 [front_light] : disable power\r\n");
-
-    return;
-}
-
-void board_B02_enable_light_strip_white_power ()
+void board_B02_enable_light_strip_white_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_white] : enable power\r\n");
 
     return;
 }
 
-void board_B02_disable_light_strip_white_power ()
+void board_B02_disable_light_strip_white_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_white] : disable power\r\n");
 
     return;
 }
 
-void board_B02_enable_light_strip_green_power ()
+void board_B02_enable_light_strip_green_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_green] : enable power\r\n");
 
     return;
 }
 
-void board_B02_disable_light_strip_green_power ()
+void board_B02_disable_light_strip_green_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_green] : disable power\r\n");
 
     return;
 }
 
-void board_B02_enable_light_strip_blue_power ()
+void board_B02_enable_light_strip_blue_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_blue] : enable power\r\n");
 
     return;
 }
 
-void board_B02_disable_light_strip_blue_power ()
+void board_B02_disable_light_strip_blue_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_blue] : disable power\r\n");
 
     return;
 }
 
-void board_B02_enable_light_strip_red_power ()
+void board_B02_enable_light_strip_red_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_red] : enable power\r\n");
 
     return;
 }
 
-void board_B02_disable_light_strip_red_power ()
+void board_B02_disable_light_strip_red_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_red] : disable power\r\n");
 
     return;
 }
 
-void board_B02_enable_buzzer_power ()
+void board_B02_enable_buzzer_power (std_error_t * const error)
 {
     LOG("Board B02 [buzzer] : enable power\r\n");
 
     return;
 }
 
-void board_B02_disable_buzzer_power ()
+void board_B02_disable_buzzer_power (std_error_t * const error)
 {
     LOG("Board B02 [buzzer] : disable power\r\n");
 
     return;
 }
 
-void board_B02_enable_front_pir_power ()
+void board_B02_enable_front_light_power (std_error_t * const error)
+{
+    LOG("Board B02 [front_light] : enable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_5, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
+    return;
+}
+
+void board_B02_disable_front_light_power (std_error_t * const error)
+{
+    LOG("Board B02 [front_light] : disable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_5, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
+    return;
+}
+
+void board_B02_enable_front_pir_power (std_error_t * const error)
 {
     LOG("Board B02 [front_pir] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_direction(config.mcp23017_expander, PORT_B, PIN_6, INPUT_DIRECTION, error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error->text);
+    }
+
+    mcp23017_expander_int_config_t int_config;
+    int_config.control      = ENABLE_INTERRUPT;
+    int_config.cmp_mode     = DISABLE_COMPARISON;
+    int_config.cmp_value    = LOW_COMPARISON_VALUE;
+    int_config.polarity     = SAME_POLARITY;
+    int_config.pullup       = DISABLE_PULL_UP;
+
+    if (mcp23017_expander_set_pin_int(config.mcp23017_expander, PORT_B, PIN_6, &int_config, error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error->text);
+    }
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_7, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
-void board_B02_disable_front_pir_power ()
+void board_B02_disable_front_pir_power (std_error_t * const error)
 {
     LOG("Board B02 [front_pir] : disable power\r\n");
 
-    return;
-}
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_7, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
+    if (mcp23017_expander_set_pin_direction(config.mcp23017_expander, PORT_B, PIN_6, OUTPUT_DIRECTION, error) != STD_SUCCESS)
+    {
+        LOG("Board [expander] : %s\r\n", error->text);
+    }
 
-void board_B02_i2c_1_lock_mock ()
-{
-    return;
-}
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_6, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
-void board_B02_i2c_1_unlock_mock ()
-{
     return;
 }
 
@@ -1090,6 +1161,27 @@ void board_B02_init_temperature_sensor ()
     if (bmp280_sensor_init(&sensor_config, &error) != STD_SUCCESS)
     {
         LOG("Board B02 [bmp280] : %s\r\n", error.text);
+    }
+
+    return;
+}
+
+void board_B02_init_pir ()
+{
+    LOG("Board B02 [pir] : init\r\n");
+
+    std_error_t error;
+    std_error_init(&error);
+
+    LOG("Board B02 [EXTI_15_10] : init\r\n");
+
+    board_exti_15_10_config_t exti_config;
+    exti_config.exti_12_callback = board_B02_door_pir_ISR;
+    exti_config.exti_15_callback = board_B02_veranda_pir_ISR;
+
+    if (board_exti_15_10_init(&exti_config, &error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [EXTI_15_10] : %s\r\n", error.text);
     }
 
     return;

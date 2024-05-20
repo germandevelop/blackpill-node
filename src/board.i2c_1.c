@@ -31,7 +31,7 @@ int board_i2c_1_init (board_i2c_1_config_t const * const init_config, std_error_
     i2c_1_handler.Instance              = I2C1;
     i2c_1_handler.MspInitCallback       = board_i2c_1_msp_init;
     i2c_1_handler.MspDeInitCallback     = board_i2c_1_msp_deinit;
-    i2c_1_handler.Init.ClockSpeed       = 400000U;
+    i2c_1_handler.Init.ClockSpeed       = 100000U;
     i2c_1_handler.Init.DutyCycle        = I2C_DUTYCYCLE_2;
     i2c_1_handler.Init.OwnAddress1      = 0U;
     i2c_1_handler.Init.AddressingMode   = I2C_ADDRESSINGMODE_7BIT;

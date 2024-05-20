@@ -11,9 +11,9 @@
 #define NODE_B02_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
 #define NODE_B02_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
 #define NODE_B02_LUMINOSITY_PERIOD_MS   (5U * 60U * 1000U)  // 5 min
-#define NODE_B02_TEMPERATURE_PERIOD_MS  (2U * 60U * 1000U)  // 2 min
+#define NODE_B02_TEMPERATURE_PERIOD_MS  (3U * 60U * 1000U)  // 2 min
 
-#define NODE_B02_DARKNESS_LEVEL_LUX 5.5F
+#define NODE_B02_DARKNESS_LEVEL_LUX 99999.9F
 
 #include <stdint.h>
 #include <stdbool.h>

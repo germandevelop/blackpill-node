@@ -57,7 +57,7 @@
 #define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT    5U
-#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 10U * 1000U) // 1 min
+#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 60U * 1000U) // 1 min
 
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
@@ -408,7 +408,7 @@ void board_remote_control_ISR (uint32_t captured_value)
         [RIGHT_BUTTON]  = RIGHT_BUTTON_CODE,
         [DOWN_BUTTON]   = DOWN_BUTTON_CODE
     };
-
+LOG("Board [rm] : 1111111111\r\n");
     vs1838_control_process_bit(&vs1838_control, captured_value);
 
     bool is_frame_ready;
@@ -734,10 +734,10 @@ void board_init_tcp_client ()
     config.spi_timeout_ms           = SPI_TIMEOUT_MS;
 
     config.mac[0] = 0xEA;
-    config.mac[1] = setup.unique_id[8];
-    config.mac[2] = setup.unique_id[9];
-    config.mac[3] = setup.unique_id[10];
-    config.mac[4] = setup.unique_id[11];
+    config.mac[1] = setup.unique_id[0];
+    config.mac[2] = setup.unique_id[2];
+    config.mac[3] = setup.unique_id[4];
+    config.mac[4] = setup.unique_id[6];
     config.mac[5] = 0xEA;
 
     config.ip[0] = node_ip_address[setup.node_id][0];
