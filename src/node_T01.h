@@ -6,9 +6,9 @@
 #ifndef NODE_T01_H
 #define NODE_T01_H
 
-#define NODE_T01_LIGHT_DURATION_MS      (30U * 1000U)       // 30 seconds
-#define NODE_T01_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
-#define NODE_T01_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
+#define NODE_T01_LIGHT_DURATION_MS      (40U * 1000U)       // 40 seconds
+#define NODE_T01_DISPLAY_DURATION_MS    (40U * 1000U)       // 40 seconds
+#define NODE_T01_INTRUSION_DURATION_MS  (40U * 1000U)       // 40 seconds
 #define NODE_T01_LUMINOSITY_PERIOD_MS   (12U * 60U * 1000U) // 12 min
 #define NODE_T01_HUMIDITY_PERIOD_MS     (2U * 60U * 1000U)  // 2 min
 #define NODE_T01_DOOR_STATE_PERIOD_MS   (10U * 60U * 1000U) // 10 min

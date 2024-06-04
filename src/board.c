@@ -57,7 +57,7 @@
 #define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT    5U
-#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (1U * 60U * 1000U) // 1 min
+#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (2U * 60U * 1000U) // 1 min
 
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"

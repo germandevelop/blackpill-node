@@ -150,15 +150,16 @@ void board_i2c_1_msp_init (I2C_HandleTypeDef *i2c_handler)
 
     if (config.mapping == PORT_B_PIN_6_7)
     {
-        GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+        GPIO_InitStruct.Pin     = GPIO_PIN_6 | GPIO_PIN_7;
+        GPIO_InitStruct.Pull    = GPIO_PULLUP;
     }
     else
     {
-        GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+        GPIO_InitStruct.Pin     = GPIO_PIN_8 | GPIO_PIN_9;
+        GPIO_InitStruct.Pull    = GPIO_NOPULL;
     }
 
     GPIO_InitStruct.Mode        = GPIO_MODE_AF_OD;
-    GPIO_InitStruct.Pull        = GPIO_NOPULL;
     GPIO_InitStruct.Speed       = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate   = GPIO_AF4_I2C1;
         

@@ -128,7 +128,6 @@ void board_T01_task (void *parameters)
 
     node_T01_init(node);
     board_T01_init_humidity_sensor();
-    board_T01_init_pir_and_reed_switch();
 
     std_error_t error;
     std_error_init(&error);
@@ -142,7 +141,6 @@ void board_T01_task (void *parameters)
     bool is_display_enabled     = false;
 
     xTimerChangePeriod(humidity_timer, pdMS_TO_TICKS(NODE_T01_HUMIDITY_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
-    xTimerChangePeriod(reed_switch_timer, pdMS_TO_TICKS(NODE_T01_DOOR_STATE_PERIOD_MS), RTOS_TIMER_TICKS_TO_WAIT);
 
     while (true)
     {
@@ -698,6 +696,18 @@ void board_T01_read_humidity_data (std_error_t * const error)
     xSemaphoreGive(node_mutex);
 
     xTimerChangePeriod(humidity_timer, pdMS_TO_TICKS(next_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
+    
+
+    static bool is_pir_and_reed_switch_initialized = false;
+
+    if (is_pir_and_reed_switch_initialized == false)
+    {
+        is_pir_and_reed_switch_initialized = true;
+
+        board_T01_init_pir_and_reed_switch();
+
+        xTimerChangePeriod(reed_switch_timer, pdMS_TO_TICKS(5U * 1000U), RTOS_TIMER_TICKS_TO_WAIT);
+    }
 
     return;
 }

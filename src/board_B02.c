@@ -151,7 +151,6 @@ void board_B02_task (void *parameters)
 
     node_B02_init(node);
     board_B02_init_temperature_sensor();
-    board_B02_init_pir();
 
     std_error_t error;
     std_error_init(&error);
@@ -1095,10 +1094,16 @@ void board_B02_door_pir_ISR ()
     {
         last_tick_count_ms = tick_count_ms;
 
-        BaseType_t is_higher_priority_task_woken;
-        xTaskNotifyFromISR(task, DOOR_PIR_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
+        bool is_high;
+        board_exti_15_10_get_12(&is_high);
 
-        portYIELD_FROM_ISR(is_higher_priority_task_woken);
+        if (is_high == true)
+        {
+            BaseType_t is_higher_priority_task_woken;
+            xTaskNotifyFromISR(task, DOOR_PIR_NOTIFICATION, eSetBits, &is_higher_priority_task_woken);
+
+            portYIELD_FROM_ISR(is_higher_priority_task_woken);
+        }
     }
 
     return;
