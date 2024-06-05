@@ -578,6 +578,8 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data, std_
 
     LOG("Board T01 [display] : draw yellow\r\n");
 
+    const float pressureMM = data->pressure_hPa * 0.7506F;
+
     // Prepare text to draw
     const uint8_t error_text[] = {  0xCE, 0xF8, 0xE8, 0xE1, 0xEA, 0xE0 };
 
@@ -585,7 +587,7 @@ void board_T01_draw_yellow_display (node_T01_humidity_t const * const data, std_
     sprintf(hum_value, "%.1f %%", data->humidity_pct);
 
     char press_value[16] = { '\0' };
-    sprintf(press_value, "%.0f MM", data->pressure_hPa);
+    sprintf(press_value, "%.0f MM", pressureMM);
 
     const uint8_t x_hum_min = 2U, y_hum_min = 8U;
     const uint8_t x_hum_max = 32U, y_hum_max = 16U;

@@ -57,7 +57,7 @@
 #define I2C_TIMEOUT_MS  (1U * 1000U)    // 1 sec
 
 #define PHOTORESISTOR_MEAUSEREMENT_COUNT    5U
-#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (2U * 60U * 1000U) // 1 min
+#define PHOTORESISTOR_DEFAULT_PERIOD_MS     (2U * 60U * 1000U) // 2 min
 
 #define DEFAULT_ERROR_TEXT  "Board error"
 #define MALLOC_ERROR_TEXT   "Board memory allocation error"
@@ -119,9 +119,9 @@ int board_init (board_config_t const * const init_config, std_error_t * const er
 
     config = *init_config;
 
-#ifndef NDEBUG
+//#ifndef NDEBUG
     board_init_logger();
-#endif // NDEBUG
+//#endif // NDEBUG
 
     return board_malloc(error);
 }

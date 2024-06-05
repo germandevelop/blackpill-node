@@ -20,7 +20,7 @@ void logger_init (logger_config_t const * const init_config)
 }
 
 // Redefine
-#ifndef NDEBUG
+//#ifndef NDEBUG
 
 int _write(int fd, char *ptr, int len)
 {
@@ -33,4 +33,4 @@ int _write(int fd, char *ptr, int len)
     return len;
 }
 
-#endif // NDEBUG
+//#endif // NDEBUG

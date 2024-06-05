@@ -6,14 +6,14 @@
 #ifndef NODE_B02_H
 #define NODE_B02_H
 
-#define NODE_B02_LIGHT_DURATION_MS      (30U * 1000U)       // 30 seconds
-#define NODE_B02_BUZZER_DURATION_MS     (10U * 1000U)       // 10 seconds
-#define NODE_B02_DISPLAY_DURATION_MS    (30U * 1000U)       // 30 seconds
-#define NODE_B02_INTRUSION_DURATION_MS  (30U * 1000U)       // 30 seconds
-#define NODE_B02_LUMINOSITY_PERIOD_MS   (5U * 60U * 1000U)  // 5 min
-#define NODE_B02_TEMPERATURE_PERIOD_MS  (3U * 60U * 1000U)  // 2 min
+#define NODE_B02_LIGHT_DURATION_MS      (40U * 1000U)       // 40 seconds
+#define NODE_B02_BUZZER_DURATION_MS     (15U * 1000U)       // 15 seconds
+#define NODE_B02_DISPLAY_DURATION_MS    (40U * 1000U)       // 40 seconds
+#define NODE_B02_INTRUSION_DURATION_MS  (40U * 1000U)       // 40 seconds
+#define NODE_B02_LUMINOSITY_PERIOD_MS   (15U * 60U * 1000U) // 15 min
+#define NODE_B02_TEMPERATURE_PERIOD_MS  (2U * 60U * 1000U)  // 2 min
 
-#define NODE_B02_DARKNESS_LEVEL_LUX 99999.9F
+#define NODE_B02_DARKNESS_LEVEL_LUX 11.5F
 
 #include <stdint.h>
 #include <stdbool.h>

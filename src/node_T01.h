@@ -9,13 +9,13 @@
 #define NODE_T01_LIGHT_DURATION_MS      (40U * 1000U)       // 40 seconds
 #define NODE_T01_DISPLAY_DURATION_MS    (40U * 1000U)       // 40 seconds
 #define NODE_T01_INTRUSION_DURATION_MS  (40U * 1000U)       // 40 seconds
-#define NODE_T01_LUMINOSITY_PERIOD_MS   (12U * 60U * 1000U) // 12 min
+#define NODE_T01_LUMINOSITY_PERIOD_MS   (15U * 60U * 1000U) // 15 min
 #define NODE_T01_HUMIDITY_PERIOD_MS     (2U * 60U * 1000U)  // 2 min
 #define NODE_T01_DOOR_STATE_PERIOD_MS   (10U * 60U * 1000U) // 10 min
 
 #define NODE_T01_DARKNESS_LEVEL_LUX 11.5F
 #define NODE_T01_HIGH_TEMPERATURE_C 25.0F
-#define NODE_T01_LOW_TEMPERATURE_C  15.0F
+#define NODE_T01_LOW_TEMPERATURE_C  16.0F
 
 #include <stdint.h>
 #include <stdbool.h>

@@ -123,7 +123,7 @@ static void board_B02_front_pir_ISR ();
 static void board_B02_veranda_pir_ISR ();
 
 static void board_B02_init_temperature_sensor ();
-static void board_B02_init_pir ();
+static void board_B02_init_pirs ();
 
 int board_B02_init (board_extension_config_t const * const init_config, std_error_t * const error)
 {
@@ -585,10 +585,10 @@ void board_B02_process_photoresistor_data (photoresistor_data_t const * const da
     assert(data         != NULL);
     assert(next_time_ms != NULL);
 
-    const float gamma                   = 0.60F;        // Probably it does not work
-    const float one_lux_resistance_Ohm  = 200000.0F;    // Probably it does not work
+    const float gamma                   = 1.70F;
+    const float one_lux_resistance_Ohm  = 200000.0F;
 
-    const float lux = pow(10.0F, (log10(one_lux_resistance_Ohm / (float)(data->resistance_Ohm)) / gamma));  // Probably it does not work
+    const float lux = pow(10.0F, (log10(one_lux_resistance_Ohm / (float)(data->resistance_Ohm)) / gamma));
 
     LOG("Board B02 [photoresistor] : luminosity = %.2f lux\r\n", lux);
 
@@ -877,6 +877,16 @@ void board_B02_read_temperature_data (std_error_t * const error)
 
     xTimerChangePeriod(temperature_timer, pdMS_TO_TICKS(next_time_ms), RTOS_TIMER_TICKS_TO_WAIT);
 
+
+    static bool are_pirs_initialized = false;
+
+    if (are_pirs_initialized == false)
+    {
+        are_pirs_initialized = true;
+
+        board_B02_init_pirs();
+    }
+
     return;
 }
 
@@ -942,12 +952,22 @@ void board_B02_enable_light_strip_white_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_white] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_2, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
 void board_B02_disable_light_strip_white_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_white] : disable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_2, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
     return;
 }
@@ -956,12 +976,22 @@ void board_B02_enable_light_strip_green_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_green] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_0, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
 void board_B02_disable_light_strip_green_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_green] : disable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_0, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
     return;
 }
@@ -970,12 +1000,22 @@ void board_B02_enable_light_strip_blue_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_blue] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_1, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
 void board_B02_disable_light_strip_blue_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_blue] : disable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_1, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
     return;
 }
@@ -984,12 +1024,22 @@ void board_B02_enable_light_strip_red_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_red] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_1, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
 void board_B02_disable_light_strip_red_power (std_error_t * const error)
 {
     LOG("Board B02 [strip_red] : disable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_B, PIN_1, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
     return;
 }
@@ -998,12 +1048,22 @@ void board_B02_enable_buzzer_power (std_error_t * const error)
 {
     LOG("Board B02 [buzzer] : enable power\r\n");
 
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_0, HIGH_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
+
     return;
 }
 
 void board_B02_disable_buzzer_power (std_error_t * const error)
 {
     LOG("Board B02 [buzzer] : disable power\r\n");
+
+    if (mcp23017_expander_set_pin_out(config.mcp23017_expander, PORT_A, PIN_0, LOW_GPIO, error) != STD_SUCCESS)
+    {
+        LOG("Board B02 [expander] : %s\r\n", error->text);
+    }
 
     return;
 }
@@ -1171,7 +1231,7 @@ void board_B02_init_temperature_sensor ()
     return;
 }
 
-void board_B02_init_pir ()
+void board_B02_init_pirs ()
 {
     LOG("Board B02 [pir] : init\r\n");
 
